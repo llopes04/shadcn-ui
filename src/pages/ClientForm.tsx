@@ -1,0 +1,220 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { Client, Generator } from '@/types';
+import GeneratorForm from '@/components/GeneratorForm';
+
+export default function ClientForm() {
+  const navigate = useNavigate();
+  const [clients, setClients] = useLocalStorage<Client[]>('clients', []);
+  const [formData, setFormData] = useState({
+    nome: '',
+    endereco: '',
+    telefone: '',
+    email: ''
+  });
+  const [geradores, setGeradores] = useState<Generator[]>([]);
+  const [showGeneratorForm, setShowGeneratorForm] = useState(false);
+  const [editingGenerator, setEditingGenerator] = useState<Generator | null>(null);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const newClient: Client = {
+      id: Date.now().toString(),
+      ...formData,
+      geradores: [...geradores] // Garantir que é uma nova referência
+    };
+
+    console.log('Salvando cliente:', newClient); // Debug
+    setClients([...clients, newClient]);
+    navigate('/clients');
+  };
+
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddGenerator = (generator: Generator) => {
+    if (editingGenerator) {
+      setGeradores(prev => prev.map(g => g.id === generator.id ? generator : g));
+      setEditingGenerator(null);
+    } else {
+      setGeradores(prev => [...prev, generator]);
+    }
+    setShowGeneratorForm(false);
+  };
+
+  const handleEditGenerator = (generator: Generator) => {
+    setEditingGenerator(generator);
+    setShowGeneratorForm(true);
+  };
+
+  const handleDeleteGenerator = (id: string) => {
+    setGeradores(prev => prev.filter(g => g.id !== id));
+  };
+
+  const handleCancelGenerator = () => {
+    setShowGeneratorForm(false);
+    setEditingGenerator(null);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center mb-6">
+          <Button variant="ghost" onClick={() => navigate('/clients')} className="mr-4">
+            ← Voltar
+          </Button>
+          <h1 className="text-2xl font-bold">Novo Cliente</h1>
+        </div>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Informações do Cliente</CardTitle>
+            <CardDescription>Preencha os dados do novo cliente</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nome *</label>
+                <Input
+                  value={formData.nome}
+                  onChange={(e) => handleInputChange('nome', e.target.value)}
+                  placeholder="Nome completo"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Endereço</label>
+                <Input
+                  value={formData.endereco}
+                  onChange={(e) => handleInputChange('endereco', e.target.value)}
+                  placeholder="Endereço completo"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Telefone</label>
+                <Input
+                  value={formData.telefone}
+                  onChange={(e) => handleInputChange('telefone', e.target.value)}
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email</label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="email@exemplo.com"
+                />
+              </div>
+
+              <div className="pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Geradores</h3>
+                  <Button 
+                    type="button" 
+                    onClick={(e) => {
+                      e.preventDefault(); // Impedir propagação do evento
+                      setShowGeneratorForm(true);
+                    }}
+                    variant="outline"
+                  >
+                    + Adicionar Gerador
+                  </Button>
+                </div>
+
+                {geradores.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">
+                    Nenhum gerador adicionado
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {geradores.map((gerador) => (
+                      <div key={gerador.id} className="border rounded-lg p-4 bg-white">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-medium">{gerador.motor || 'Motor'} / {gerador.gerador || 'Gerador'}</h4>
+                            <p className="text-sm text-gray-600">
+                              Modelo Motor: {gerador.modelo_motor || 'N/A'}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Nº Série Motor: {gerador.serie_motor || 'N/A'}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Modelo Gerador: {gerador.modelo_gerador || 'N/A'}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Nº Série Gerador: {gerador.serie_gerador || 'N/A'}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              USCA: {gerador.usca || 'N/A'}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault(); // Impedir propagação
+                                handleEditGenerator(gerador);
+                              }}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={(e) => {
+                                e.preventDefault(); // Impedir propagação
+                                handleDeleteGenerator(gerador.id);
+                              }}
+                            >
+                              Excluir
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 pt-6">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => navigate('/clients')}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" className="flex-1 bg-green-600 hover:bg-green-700">
+                  Salvar Cliente
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {showGeneratorForm && (
+          <Card className="mb-6">
+            <GeneratorForm
+              generator={editingGenerator || undefined}
+              onSubmit={handleAddGenerator}
+              onCancel={handleCancelGenerator}
+            />
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}

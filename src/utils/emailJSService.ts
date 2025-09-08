@@ -10,9 +10,9 @@ export interface EmailJSConfig {
 }
 
 export const defaultEmailJSConfig: EmailJSConfig = {
-  serviceId: '',
-  templateId: '',
-  publicKey: ''
+  serviceId: 'service_qwtsafe',
+  templateId: 'template_ll647ew',
+  publicKey: 'DzFTH1PSxzQME9aZ3'
 };
 
 interface LegacyServiceOrder extends Omit<ServiceOrder, 'geradores'> {

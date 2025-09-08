@@ -1,1 +1,13 @@
-/// <reference types="vite/client" />
+# Firebase Configuration
+VITE_FIREBASE_API_KEY=AIzaSyBe601bh0wb3movKw6TfsLeAc9ziufgHAY
+VITE_FIREBASE_AUTH_DOMAIN=projeto-sermag.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=projeto-sermag
+VITE_FIREBASE_STORAGE_BUCKET=projeto-sermag.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
+VITE_FIREBASE_APP_ID='1:136825219532:web:47d767b7da9c0e2b84d569'
+
+
+# EmailJS Configuration
+VITE_EMAILJS_SERVICE_ID=service_qwtsafe
+VITE_EMAILJS_TEMPLATE_ID=template_ll647ew
+VITE_EMAILJS_PUBLIC_KEY=DzFTH1PSxzQME9aZ3

@@ -3,17 +3,17 @@ import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
-// Configuração padrão (será substituída pelas configurações do usuário)
-const defaultFirebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
-};
+// Configuração padrão usando variáveis de ambiente como fallback
+const getDefaultConfig = () => ({
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
+});
 
-// Função para obter configuração do Firebase do localStorage
+// Função para obter configuração do Firebase (localStorage tem prioridade)
 const getFirebaseConfig = () => {
   try {
     const storedConfig = localStorage.getItem('firebaseConfig');
@@ -27,7 +27,14 @@ const getFirebaseConfig = () => {
   } catch (error) {
     console.error('Erro ao carregar configuração do Firebase:', error);
   }
-  return defaultFirebaseConfig;
+  
+  // Fallback para configuração padrão das variáveis de ambiente
+  const defaultConfig = getDefaultConfig();
+  if (defaultConfig.apiKey && defaultConfig.projectId) {
+    return defaultConfig;
+  }
+  
+  return null;
 };
 
 // Inicializar Firebase
@@ -41,7 +48,7 @@ const initializeFirebase = () => {
     const config = getFirebaseConfig();
     
     // Só inicializar se tiver configuração válida
-    if (config.apiKey && config.projectId) {
+    if (config && config.apiKey && config.projectId) {
       app = initializeApp(config);
       db = getFirestore(app);
       auth = getAuth(app);
@@ -62,7 +69,7 @@ const initializeFirebase = () => {
 // Função para verificar se Firebase está configurado
 export const isFirebaseConfigured = () => {
   const config = getFirebaseConfig();
-  return !!(config.apiKey && config.projectId);
+  return !!(config && config.apiKey && config.projectId);
 };
 
 // Função para reinicializar Firebase após mudança de configuração

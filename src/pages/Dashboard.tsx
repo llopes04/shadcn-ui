@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ServiceOrder, Client } from '@/types';
 import { Settings, Database, FileText, UserPlus, ClipboardList, User, Image, Mail } from 'lucide-react';
+import SyncControls from '@/components/SyncControls';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -69,6 +70,11 @@ export default function Dashboard() {
               <div className="text-2xl font-bold">{pendingOrders}</div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Sync Controls */}
+        <div className="mb-6">
+          <SyncControls />
         </div>
 
         {/* Quick Actions */}

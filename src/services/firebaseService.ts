@@ -24,6 +24,32 @@ const checkFirebaseConfig = () => {
   }
 };
 
+// Função para converter Timestamps do Firestore para strings
+const convertFirestoreData = (data: any): any => {
+  if (!data) return data;
+  
+  const converted = { ...data };
+  
+  // Converter Timestamps para strings
+  Object.keys(converted).forEach(key => {
+    if (converted[key] && typeof converted[key] === 'object') {
+      // Se for um Timestamp do Firestore
+      if (converted[key].toDate && typeof converted[key].toDate === 'function') {
+        converted[key] = converted[key].toDate().toISOString().split('T')[0]; // Formato YYYY-MM-DD
+      }
+      // Se for um objeto aninhado, aplicar recursivamente
+      else if (Array.isArray(converted[key])) {
+        converted[key] = converted[key].map((item: any) => convertFirestoreData(item));
+      }
+      else if (converted[key].constructor === Object) {
+        converted[key] = convertFirestoreData(converted[key]);
+      }
+    }
+  });
+  
+  return converted;
+};
+
 // Serviços para Usuários
 export const userService = {
   async create(user: Omit<User, 'id'>) {
@@ -38,10 +64,13 @@ export const userService = {
   async getAll() {
     checkFirebaseConfig();
     const querySnapshot = await getDocs(collection(db, 'users'));
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as User[];
+    return querySnapshot.docs.map(doc => {
+      const data = convertFirestoreData(doc.data());
+      return {
+        id: doc.id,
+        ...data
+      };
+    }) as User[];
   },
 
   async getByEmail(email: string) {
@@ -50,10 +79,11 @@ export const userService = {
     const querySnapshot = await getDocs(q);
     if (querySnapshot.empty) return null;
     
-    const doc = querySnapshot.docs[0];
+    const docData = querySnapshot.docs[0];
+    const data = convertFirestoreData(docData.data());
     return {
-      id: doc.id,
-      ...doc.data()
+      id: docData.id,
+      ...data
     } as User;
   },
 
@@ -88,10 +118,13 @@ export const clientService = {
     const querySnapshot = await getDocs(
       query(collection(db, 'clients'), orderBy('createdAt', 'desc'))
     );
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Client[];
+    return querySnapshot.docs.map(doc => {
+      const data = convertFirestoreData(doc.data());
+      return {
+        id: doc.id,
+        ...data
+      };
+    }) as Client[];
   },
 
   async getById(id: string) {
@@ -101,9 +134,10 @@ export const clientService = {
     if (docSnap.empty) return null;
     
     const clientDoc = docSnap.docs[0];
+    const data = convertFirestoreData(clientDoc.data());
     return {
       id: clientDoc.id,
-      ...clientDoc.data()
+      ...data
     } as Client;
   },
 
@@ -127,10 +161,13 @@ export const clientService = {
     return onSnapshot(
       query(collection(db, 'clients'), orderBy('createdAt', 'desc')),
       (snapshot) => {
-        const clients = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Client[];
+        const clients = snapshot.docs.map(doc => {
+          const data = convertFirestoreData(doc.data());
+          return {
+            id: doc.id,
+            ...data
+          };
+        }) as Client[];
         callback(clients);
       }
     );
@@ -153,10 +190,13 @@ export const serviceOrderService = {
     const querySnapshot = await getDocs(
       query(collection(db, 'serviceOrders'), orderBy('createdAt', 'desc'))
     );
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as ServiceOrder[];
+    return querySnapshot.docs.map(doc => {
+      const data = convertFirestoreData(doc.data());
+      return {
+        id: doc.id,
+        ...data
+      };
+    }) as ServiceOrder[];
   },
 
   async getById(id: string) {
@@ -165,9 +205,10 @@ export const serviceOrderService = {
     if (docSnap.empty) return null;
     
     const orderDoc = docSnap.docs[0];
+    const data = convertFirestoreData(orderDoc.data());
     return {
       id: orderDoc.id,
-      ...orderDoc.data()
+      ...data
     } as ServiceOrder;
   },
 
@@ -179,10 +220,13 @@ export const serviceOrderService = {
       orderBy('createdAt', 'desc')
     );
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as ServiceOrder[];
+    return querySnapshot.docs.map(doc => {
+      const data = convertFirestoreData(doc.data());
+      return {
+        id: doc.id,
+        ...data
+      };
+    }) as ServiceOrder[];
   },
 
   async update(id: string, data: Partial<ServiceOrder>) {
@@ -205,10 +249,13 @@ export const serviceOrderService = {
     return onSnapshot(
       query(collection(db, 'serviceOrders'), orderBy('createdAt', 'desc')),
       (snapshot) => {
-        const orders = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as ServiceOrder[];
+        const orders = snapshot.docs.map(doc => {
+          const data = convertFirestoreData(doc.data());
+          return {
+            id: doc.id,
+            ...data
+          };
+        }) as ServiceOrder[];
         callback(orders);
       }
     );
@@ -222,28 +269,43 @@ export const syncService = {
     checkFirebaseConfig();
     
     try {
+      console.log('🚀 Iniciando sincronização para Firebase...');
+      
       // Sincronizar clientes
       const localClients = JSON.parse(localStorage.getItem('clients') || '[]') as Client[];
+      console.log('📋 Clientes locais encontrados:', localClients.length);
+      
+      let clientsUploaded = 0;
       for (const client of localClients) {
         if (client.id && !client.id.includes('firebase_')) {
           const { id, ...clientData } = client;
           await clientService.create(clientData);
+          clientsUploaded++;
+          console.log('✅ Cliente enviado:', client.nome);
         }
       }
 
       // Sincronizar ordens de serviço
       const localOrders = JSON.parse(localStorage.getItem('serviceOrders') || '[]') as ServiceOrder[];
+      console.log('📋 Ordens locais encontradas:', localOrders.length);
+      
+      let ordersUploaded = 0;
       for (const order of localOrders) {
         if (order.id && !order.id.includes('firebase_')) {
           const { id, ...orderData } = order;
           await serviceOrderService.create(orderData);
+          ordersUploaded++;
+          console.log('✅ Ordem enviada:', order.tecnico, '-', order.data);
         }
       }
 
-      return { success: true, message: 'Dados sincronizados com sucesso!' };
+      const message = `Sincronização concluída! ${clientsUploaded} clientes e ${ordersUploaded} ordens enviadas.`;
+      console.log('🎉', message);
+      return { success: true, message };
+      
     } catch (error) {
-      console.error('Erro na sincronização:', error);
-      return { success: false, message: 'Erro ao sincronizar dados.' };
+      console.error('❌ Erro na sincronização:', error);
+      return { success: false, message: `Erro ao sincronizar dados: ${error instanceof Error ? error.message : 'Erro desconhecido'}` };
     }
   },
 
@@ -252,9 +314,14 @@ export const syncService = {
     checkFirebaseConfig();
     
     try {
+      console.log('⬇️ Iniciando download do Firebase...');
+      
       // Buscar clientes do Firebase
       const firebaseClients = await clientService.getAll();
+      console.log('📥 Clientes do Firebase:', firebaseClients.length);
+      
       const localClients = JSON.parse(localStorage.getItem('clients') || '[]') as Client[];
+      console.log('📱 Clientes locais:', localClients.length);
       
       // Mesclar dados (Firebase tem prioridade)
       const mergedClients = [...firebaseClients];
@@ -265,25 +332,44 @@ export const syncService = {
       });
       
       localStorage.setItem('clients', JSON.stringify(mergedClients));
+      console.log('✅ Clientes mesclados:', mergedClients.length);
 
       // Buscar ordens do Firebase
       const firebaseOrders = await serviceOrderService.getAll();
+      console.log('📥 Ordens do Firebase:', firebaseOrders.length);
+      
+      // Log detalhado das ordens do Firebase
+      firebaseOrders.forEach((order, index) => {
+        console.log(`📋 Ordem ${index + 1}:`, {
+          id: order.id,
+          tecnico: order.tecnico,
+          data: order.data,
+          cliente_id: order.cliente_id,
+          geradores: order.geradores?.length || 0
+        });
+      });
+      
       const localOrders = JSON.parse(localStorage.getItem('serviceOrders') || '[]') as ServiceOrder[];
+      console.log('📱 Ordens locais:', localOrders.length);
       
       // Mesclar dados (Firebase tem prioridade)
       const mergedOrders = [...firebaseOrders];
       localOrders.forEach(localOrder => {
-        if (!firebaseOrders.find(fo => fo.tecnico === localOrder.tecnico && fo.data === localOrder.data)) {
+        if (!firebaseOrders.find(fo => fo.tecnico === localOrder.tecnico && fo.data === localOrder.data && fo.cliente_id === localOrder.cliente_id)) {
           mergedOrders.push(localOrder);
         }
       });
       
       localStorage.setItem('serviceOrders', JSON.stringify(mergedOrders));
+      console.log('✅ Ordens mescladas:', mergedOrders.length);
 
-      return { success: true, message: 'Dados baixados do Firebase com sucesso!' };
+      const message = `Dados baixados com sucesso! ${mergedClients.length} clientes e ${mergedOrders.length} ordens sincronizadas.`;
+      console.log('🎉', message);
+      return { success: true, message };
+      
     } catch (error) {
-      console.error('Erro ao baixar dados:', error);
-      return { success: false, message: 'Erro ao baixar dados do Firebase.' };
+      console.error('❌ Erro ao baixar dados:', error);
+      return { success: false, message: `Erro ao baixar dados do Firebase: ${error instanceof Error ? error.message : 'Erro desconhecido'}` };
     }
   }
 };

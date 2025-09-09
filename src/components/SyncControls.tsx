@@ -4,11 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { syncService } from '@/services/firebaseService';
 import { isFirebaseConfigured } from '@/lib/firebase';
-import { Upload, Download, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, Download, CheckCircle, AlertCircle, Loader2, Database, RefreshCw } from 'lucide-react';
 
 export default function SyncControls() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleSyncToFirebase = async () => {
@@ -21,15 +22,19 @@ export default function SyncControls() {
     setMessage(null);
 
     try {
+      console.log('🚀 Iniciando sincronização para Firebase...');
       const result = await syncService.syncToFirebase();
+      console.log('📊 Resultado da sincronização:', result);
+      
       setMessage({ 
         type: result.success ? 'success' : 'error', 
         text: result.message 
       });
     } catch (error) {
+      console.error('❌ Erro detalhado:', error);
       setMessage({ 
         type: 'error', 
-        text: 'Erro ao sincronizar dados para o Firebase.' 
+        text: `Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}` 
       });
     } finally {
       setIsUploading(false);
@@ -46,7 +51,10 @@ export default function SyncControls() {
     setMessage(null);
 
     try {
+      console.log('⬇️ Iniciando download do Firebase...');
       const result = await syncService.syncFromFirebase();
+      console.log('📊 Resultado do download:', result);
+      
       setMessage({ 
         type: result.success ? 'success' : 'error', 
         text: result.message 
@@ -54,15 +62,50 @@ export default function SyncControls() {
       
       if (result.success) {
         // Recarregar a página para atualizar os dados
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 1500);
       }
     } catch (error) {
+      console.error('❌ Erro detalhado:', error);
       setMessage({ 
         type: 'error', 
-        text: 'Erro ao baixar dados do Firebase.' 
+        text: `Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}` 
       });
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleMergeFromFirebase = async () => {
+    if (!isFirebaseConfigured()) {
+      setMessage({ type: 'error', text: 'Firebase não está configurado. Configure primeiro.' });
+      return;
+    }
+
+    setIsMerging(true);
+    setMessage(null);
+
+    try {
+      console.log('🔄 Iniciando mesclagem com Firebase...');
+      const result = await syncService.mergeFromFirebase();
+      console.log('📊 Resultado da mesclagem:', result);
+      
+      setMessage({ 
+        type: result.success ? 'success' : 'error', 
+        text: result.message 
+      });
+      
+      if (result.success) {
+        // Recarregar a página para atualizar os dados
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    } catch (error) {
+      console.error('❌ Erro detalhado:', error);
+      setMessage({ 
+        type: 'error', 
+        text: `Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}` 
+      });
+    } finally {
+      setIsMerging(false);
     }
   };
 
@@ -72,6 +115,7 @@ export default function SyncControls() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
+          <Database className="w-5 h-5" />
           Sincronização Firebase
           {isConfigured ? (
             <CheckCircle className="w-5 h-5 text-green-600" />
@@ -100,7 +144,7 @@ export default function SyncControls() {
           </Alert>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           <Button
             onClick={handleSyncToFirebase}
             disabled={!isConfigured || isUploading}
@@ -125,14 +169,42 @@ export default function SyncControls() {
             ) : (
               <Download className="w-4 h-4" />
             )}
-            {isDownloading ? 'Baixando...' : 'Baixar do Firebase'}
+            {isDownloading ? 'Baixando...' : 'Baixar do Firebase (Substituir)'}
+          </Button>
+
+          <Button
+            variant="secondary"
+            onClick={handleMergeFromFirebase}
+            disabled={!isConfigured || isMerging}
+            className="flex items-center gap-2"
+          >
+            {isMerging ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4" />
+            )}
+            {isMerging ? 'Mesclando...' : 'Mesclar com Firebase'}
           </Button>
         </div>
 
         <div className="text-sm text-gray-600 space-y-1">
           <p><strong>Enviar para Firebase:</strong> Salva seus dados locais no Firebase</p>
-          <p><strong>Baixar do Firebase:</strong> Atualiza seus dados locais com os do Firebase</p>
+          <p><strong>Baixar do Firebase (Substituir):</strong> Substitui completamente seus dados locais pelos do Firebase</p>
+          <p><strong>Mesclar com Firebase:</strong> Combina dados locais com os do Firebase (sem duplicatas)</p>
+          <p><strong>Dica:</strong> Abra o Console do navegador (F12) para ver logs detalhados</p>
         </div>
+
+        {!isConfigured && (
+          <Alert className="border-orange-200 bg-orange-50">
+            <AlertCircle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <strong>Configuração necessária:</strong><br/>
+              1. Configure o Firebase em "Configurar Firebase"<br/>
+              2. Ative o Firestore Database no Firebase Console<br/>
+              3. Configure as regras de segurança para modo teste
+            </AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   );

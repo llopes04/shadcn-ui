@@ -4,11 +4,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { syncService } from '@/services/firebaseService';
 import { isFirebaseConfigured } from '@/lib/firebase';
-import { Upload, Download, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, Download, CheckCircle, AlertCircle, Loader2, Trash2 } from 'lucide-react';
 
 export default function SyncControls() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleSyncToFirebase = async () => {
@@ -63,6 +64,31 @@ export default function SyncControls() {
       });
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleCleanDuplicates = async () => {
+    setIsCleaning(true);
+    setMessage(null);
+
+    try {
+      const result = await syncService.cleanDuplicates();
+      setMessage({ 
+        type: result.success ? 'success' : 'error', 
+        text: result.message 
+      });
+      
+      if (result.success) {
+        // Recarregar a página para atualizar os dados
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    } catch (error) {
+      setMessage({ 
+        type: 'error', 
+        text: 'Erro ao limpar duplicatas.' 
+      });
+    } finally {
+      setIsCleaning(false);
     }
   };
 
@@ -129,9 +155,26 @@ export default function SyncControls() {
           </Button>
         </div>
 
+        <div className="mt-4">
+          <Button
+            variant="destructive"
+            onClick={handleCleanDuplicates}
+            disabled={isCleaning}
+            className="flex items-center gap-2 w-full"
+          >
+            {isCleaning ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+            {isCleaning ? 'Limpando...' : 'Limpar Duplicatas'}
+          </Button>
+        </div>
+
         <div className="text-sm text-gray-600 space-y-1">
-          <p><strong>Enviar para Firebase:</strong> Salva seus dados locais no Firebase</p>
-          <p><strong>Baixar do Firebase:</strong> Atualiza seus dados locais com os do Firebase</p>
+          <p><strong>Enviar para Firebase:</strong> Salva seus dados locais no Firebase (evita duplicatas)</p>
+          <p><strong>Baixar do Firebase:</strong> Atualiza seus dados locais com os do Firebase (evita duplicatas)</p>
+          <p><strong>Limpar Duplicatas:</strong> Remove registros duplicados dos dados locais</p>
         </div>
       </CardContent>
     </Card>

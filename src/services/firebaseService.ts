@@ -222,25 +222,52 @@ export const syncService = {
     checkFirebaseConfig();
     
     try {
+      let clientsUploaded = 0;
+      let ordersUploaded = 0;
+
       // Sincronizar clientes
       const localClients = JSON.parse(localStorage.getItem('clients') || '[]') as Client[];
+      const firebaseClients = await clientService.getAll();
+      
       for (const client of localClients) {
-        if (client.id && !client.id.includes('firebase_')) {
+        // Verificar se o cliente já existe no Firebase
+        const existsInFirebase = firebaseClients.find(fc => 
+          (fc.nome === client.nome && fc.email === client.email) ||
+          (fc.cpf && client.cpf && fc.cpf === client.cpf) ||
+          (fc.telefone && client.telefone && fc.telefone === client.telefone)
+        );
+        
+        // Só enviar se não existir no Firebase e não for um registro já do Firebase
+        if (!existsInFirebase && (!client.id || !client.id.includes('firebase_'))) {
           const { id, ...clientData } = client;
           await clientService.create(clientData);
+          clientsUploaded++;
         }
       }
 
       // Sincronizar ordens de serviço
       const localOrders = JSON.parse(localStorage.getItem('serviceOrders') || '[]') as ServiceOrder[];
+      const firebaseOrders = await serviceOrderService.getAll();
+      
       for (const order of localOrders) {
-        if (order.id && !order.id.includes('firebase_')) {
+        // Verificar se a OS já existe no Firebase
+        const existsInFirebase = firebaseOrders.find(fo => 
+          (fo.numeroOS === order.numeroOS) ||
+          (fo.tecnico === order.tecnico && fo.data === order.data && fo.cliente?.nome === order.cliente?.nome)
+        );
+        
+        // Só enviar se não existir no Firebase e não for um registro já do Firebase
+        if (!existsInFirebase && (!order.id || !order.id.includes('firebase_'))) {
           const { id, ...orderData } = order;
           await serviceOrderService.create(orderData);
+          ordersUploaded++;
         }
       }
 
-      return { success: true, message: 'Dados sincronizados com sucesso!' };
+      return { 
+        success: true, 
+        message: `Sincronização concluída! ${clientsUploaded} clientes e ${ordersUploaded} ordens enviadas.` 
+      };
     } catch (error) {
       console.error('Erro na sincronização:', error);
       return { success: false, message: 'Erro ao sincronizar dados.' };
@@ -252,15 +279,28 @@ export const syncService = {
     checkFirebaseConfig();
     
     try {
+      let clientsDownloaded = 0;
+      let ordersDownloaded = 0;
+
       // Buscar clientes do Firebase
       const firebaseClients = await clientService.getAll();
       const localClients = JSON.parse(localStorage.getItem('clients') || '[]') as Client[];
       
-      // Mesclar dados (Firebase tem prioridade)
-      const mergedClients = [...firebaseClients];
-      localClients.forEach(localClient => {
-        if (!firebaseClients.find(fc => fc.nome === localClient.nome && fc.email === localClient.email)) {
-          mergedClients.push(localClient);
+      // Criar mapa de clientes locais para verificação rápida
+      const localClientsMap = new Map();
+      localClients.forEach(client => {
+        const key = `${client.nome}_${client.email}_${client.cpf || ''}_${client.telefone || ''}`;
+        localClientsMap.set(key, client);
+      });
+      
+      // Adicionar clientes do Firebase que não existem localmente
+      const mergedClients = [...localClients];
+      firebaseClients.forEach(firebaseClient => {
+        const key = `${firebaseClient.nome}_${firebaseClient.email}_${firebaseClient.cpf || ''}_${firebaseClient.telefone || ''}`;
+        if (!localClientsMap.has(key)) {
+          // Marcar como vindo do Firebase
+          mergedClients.push({ ...firebaseClient, id: `firebase_${firebaseClient.id}` });
+          clientsDownloaded++;
         }
       });
       
@@ -270,20 +310,74 @@ export const syncService = {
       const firebaseOrders = await serviceOrderService.getAll();
       const localOrders = JSON.parse(localStorage.getItem('serviceOrders') || '[]') as ServiceOrder[];
       
-      // Mesclar dados (Firebase tem prioridade)
-      const mergedOrders = [...firebaseOrders];
-      localOrders.forEach(localOrder => {
-        if (!firebaseOrders.find(fo => fo.tecnico === localOrder.tecnico && fo.data === localOrder.data)) {
-          mergedOrders.push(localOrder);
+      // Criar mapa de ordens locais para verificação rápida
+      const localOrdersMap = new Map();
+      localOrders.forEach(order => {
+        const key = `${order.numeroOS}_${order.tecnico}_${order.data}_${order.cliente?.nome || ''}`;
+        localOrdersMap.set(key, order);
+      });
+      
+      // Adicionar ordens do Firebase que não existem localmente
+      const mergedOrders = [...localOrders];
+      firebaseOrders.forEach(firebaseOrder => {
+        const key = `${firebaseOrder.numeroOS}_${firebaseOrder.tecnico}_${firebaseOrder.data}_${firebaseOrder.cliente?.nome || ''}`;
+        if (!localOrdersMap.has(key)) {
+          // Marcar como vindo do Firebase
+          mergedOrders.push({ ...firebaseOrder, id: `firebase_${firebaseOrder.id}` });
+          ordersDownloaded++;
         }
       });
       
       localStorage.setItem('serviceOrders', JSON.stringify(mergedOrders));
 
-      return { success: true, message: 'Dados baixados do Firebase com sucesso!' };
+      return { 
+        success: true, 
+        message: `Download concluído! ${clientsDownloaded} clientes e ${ordersDownloaded} ordens baixadas.` 
+      };
     } catch (error) {
       console.error('Erro ao baixar dados:', error);
       return { success: false, message: 'Erro ao baixar dados do Firebase.' };
+    }
+  },
+
+  // Limpar duplicatas existentes
+  async cleanDuplicates() {
+    try {
+      // Limpar duplicatas de clientes
+      const clients = JSON.parse(localStorage.getItem('clients') || '[]') as Client[];
+      const uniqueClients = clients.filter((client, index, self) => {
+        return index === self.findIndex(c => 
+          c.nome === client.nome && 
+          c.email === client.email &&
+          (c.cpf === client.cpf || (!c.cpf && !client.cpf)) &&
+          (c.telefone === client.telefone || (!c.telefone && !client.telefone))
+        );
+      });
+      
+      // Limpar duplicatas de ordens
+      const orders = JSON.parse(localStorage.getItem('serviceOrders') || '[]') as ServiceOrder[];
+      const uniqueOrders = orders.filter((order, index, self) => {
+        return index === self.findIndex(o => 
+          o.numeroOS === order.numeroOS ||
+          (o.tecnico === order.tecnico && 
+           o.data === order.data && 
+           o.cliente?.nome === order.cliente?.nome)
+        );
+      });
+      
+      localStorage.setItem('clients', JSON.stringify(uniqueClients));
+      localStorage.setItem('serviceOrders', JSON.stringify(uniqueOrders));
+      
+      const clientsRemoved = clients.length - uniqueClients.length;
+      const ordersRemoved = orders.length - uniqueOrders.length;
+      
+      return {
+        success: true,
+        message: `Limpeza concluída! ${clientsRemoved} clientes e ${ordersRemoved} ordens duplicadas removidas.`
+      };
+    } catch (error) {
+      console.error('Erro ao limpar duplicatas:', error);
+      return { success: false, message: 'Erro ao limpar duplicatas.' };
     }
   }
 };

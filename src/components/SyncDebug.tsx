@@ -34,7 +34,7 @@ export default function SyncDebug() {
         info += `  - Observações: ${order.observacoes_gerais ? 'PRESENTE' : 'AUSENTE'}\n`;
         
         // Verificar se é ordem legacy
-        const legacyOrder = order as any;
+        const legacyOrder = order as ServiceOrder & { gerador_id?: string };
         if (legacyOrder.gerador_id) {
           info += `  - ⚠️ ORDEM LEGACY - gerador_id: ${legacyOrder.gerador_id}\n`;
         }
@@ -65,7 +65,7 @@ export default function SyncDebug() {
             info += `  - Observações: ${order.observacoes_gerais ? 'PRESENTE' : 'AUSENTE'}\n`;
             
             // Verificar campos Firestore específicos
-            const firestoreOrder = order as any;
+            const firestoreOrder = order as ServiceOrder & { createdAt?: string };
             if (firestoreOrder.createdAt) {
               info += `  - CreatedAt: ${firestoreOrder.createdAt}\n`;
             }

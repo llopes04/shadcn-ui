@@ -49,8 +49,8 @@ export function FirebaseDiagnostic() {
         message: 'Conexão estabelecida com sucesso',
         details: 'Conseguiu acessar a coleção serviceOrders'
       });
-    } catch (error: any) {
-      const isPermissionError = error.code === 'permission-denied';
+    } catch (error: unknown) {
+      const isPermissionError = error instanceof Error && 'code' in error && error.code === 'permission-denied';
       diagnostics.push({
         test: 'Conexão com Firestore',
         status: 'error',
@@ -102,8 +102,8 @@ export function FirebaseDiagnostic() {
         message: 'Conseguiu criar documento no Firebase',
         details: 'O Firebase está funcionando corretamente para escrita'
       });
-    } catch (error: any) {
-      const isPermissionError = error.code === 'permission-denied';
+    } catch (error: unknown) {
+      const isPermissionError = error instanceof Error && 'code' in error && error.code === 'permission-denied';
       diagnostics.push({
         test: 'Teste de Escrita',
         status: 'error',

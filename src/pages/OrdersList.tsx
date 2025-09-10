@@ -205,9 +205,9 @@ export default function OrdersList() {
         setServiceOrders(updatedOrders);
         console.log('OS removida do localStorage');
         alert('Ordem de serviço excluída com sucesso!');
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('Erro detalhado ao excluir OS:', e);
-        const errorMessage = e?.message || 'Erro desconhecido';
+        const errorMessage = e instanceof Error ? e.message : 'Erro desconhecido';
         alert(`Falha ao excluir no Firebase: ${errorMessage}`);
       }
     }

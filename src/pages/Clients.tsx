@@ -51,9 +51,9 @@ export default function Clients() {
         setClients(clients.filter(client => client.id !== id));
         console.log('Cliente removido do localStorage');
         alert('Cliente excluído com sucesso!');
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('Erro detalhado ao excluir cliente:', e);
-        const errorMessage = e?.message || 'Erro desconhecido';
+        const errorMessage = e instanceof Error ? e.message : 'Erro desconhecido';
         alert(`Falha ao excluir no Firebase: ${errorMessage}`);
       }
     }

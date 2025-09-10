@@ -14,21 +14,27 @@ export default function Clients() {
   // Carregar dados do Firebase quando o componente for montado
   useEffect(() => {
     const loadFirebaseData = async () => {
-      if (!currentUser) return;
+      console.log('Clients: Tentando carregar dados do Firebase...');
+      console.log('Clients: currentUser:', currentUser);
       
       try {
         // Carregar clientes do Firebase
         const firebaseClients = await clientService.getAll();
+        console.log('Clients: Clientes carregados do Firebase:', firebaseClients.length);
+        
         if (firebaseClients.length > 0) {
           setClients(firebaseClients);
+          console.log('Clients: Clientes definidos no estado');
+        } else {
+          console.log('Clients: Nenhum cliente encontrado no Firebase');
         }
       } catch (error) {
-        console.error('Erro ao carregar clientes do Firebase:', error);
+        console.error('Clients: Erro ao carregar clientes do Firebase:', error);
       }
     };
 
     loadFirebaseData();
-  }, [currentUser, setClients]);
+  }, [setClients]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {

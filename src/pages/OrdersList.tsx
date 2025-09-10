@@ -30,21 +30,27 @@ export default function OrdersList() {
   // Carregar dados do Firebase quando o componente for montado
   useEffect(() => {
     const loadFirebaseData = async () => {
-      if (!currentUser) return;
+      console.log('OrdersList: Tentando carregar dados do Firebase...');
+      console.log('OrdersList: currentUser:', currentUser);
       
       try {
         // Carregar ordens de serviço do Firebase
         const firebaseOrders = await serviceOrderService.getAll();
+        console.log('OrdersList: Ordens carregadas do Firebase:', firebaseOrders.length);
+        
         if (firebaseOrders.length > 0) {
           setServiceOrders(firebaseOrders);
+          console.log('OrdersList: Ordens definidas no estado');
+        } else {
+          console.log('OrdersList: Nenhuma ordem encontrada no Firebase');
         }
       } catch (error) {
-        console.error('Erro ao carregar ordens de serviço do Firebase:', error);
+        console.error('OrdersList: Erro ao carregar ordens de serviço do Firebase:', error);
       }
     };
 
     loadFirebaseData();
-  }, [currentUser, setServiceOrders]);
+  }, [setServiceOrders]);
 
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);

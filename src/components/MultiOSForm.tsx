@@ -155,8 +155,8 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
       data,
       cliente_id: client.id,
       geradores: selectedGenerators,
-      observacoes_gerais: observacoesGerais.trim() || undefined,
-      representante: representante.trim() || undefined
+      ...(observacoesGerais.trim() && { observacoes_gerais: observacoesGerais.trim() }),
+      ...(representante.trim() && { representante: representante.trim() })
     };
 
     if (onSave) {

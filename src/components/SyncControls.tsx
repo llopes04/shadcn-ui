@@ -188,9 +188,10 @@ export default function SyncControls() {
         </div>
 
         <div className="text-sm text-gray-600 space-y-1">
-          <p><strong>Enviar para Firebase:</strong> Salva seus dados locais no Firebase</p>
+          <p><strong>Enviar para Firebase:</strong> Envia apenas dados novos para o Firebase (evita duplicatas automaticamente)</p>
           <p><strong>Baixar do Firebase (Substituir):</strong> Substitui completamente seus dados locais pelos do Firebase</p>
-          <p><strong>Mesclar com Firebase:</strong> Combina dados locais com os do Firebase (sem duplicatas)</p>
+          <p><strong>Mesclar com Firebase:</strong> Combina dados locais com os do Firebase (detecção inteligente de duplicatas)</p>
+          <p><strong>✨ Novo:</strong> Sistema inteligente de detecção de duplicatas por email, nome e outros campos únicos</p>
           <p><strong>Dica:</strong> Abra o Console do navegador (F12) para ver logs detalhados</p>
         </div>
 

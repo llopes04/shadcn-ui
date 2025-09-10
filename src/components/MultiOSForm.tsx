@@ -29,7 +29,7 @@ const VERIFICATION_ITEMS = [
   'Verificação de correias',
   'Nível de óleo lubrificante',
   'Ruídos estranhos no motor',
-  'Teste sem carga de 5min',
+  'Teste de carga 5min',
   'QTA',
   'Cabos de força/comandos',
   'Conexões e contatos elétricos',
@@ -277,7 +277,7 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                               )
                               .map((generator) => (
                                 <SelectItem key={generator.id} value={generator.id}>
-                                  {generator.gerador} - {generator.modelo_gerador}
+                                  {generator.gerador} - Série Motor: {generator.serie_motor}
                                 </SelectItem>
                               ))
                             }
@@ -380,6 +380,15 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                           />
                         </div>
                         <div>
+                          <Label htmlFor={`queda_tensao_bateria_${index}`}>Queda de tensão da bateria</Label>
+                          <Input
+                            id={`queda_tensao_bateria_${index}`}
+                            value={generatorData.queda_tensao_bateria || ''}
+                            onChange={(e) => updateGeneratorData(index, 'queda_tensao_bateria', e.target.value)}
+                            placeholder="Digite a queda de tensão"
+                          />
+                        </div>
+                        <div>
                           <Label htmlFor={`temperatura_agua_${index}`}>Temperatura Água (°C)</Label>
                           <Input
                             id={`temperatura_agua_${index}`}
@@ -422,47 +431,156 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                     <div>
                       <h4 className="font-medium mb-2">Verificações</h4>
                       <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {generatorData.verificacoes.map((verification, vIndex) => (
-                          <div key={vIndex} className="flex items-center gap-3 p-2 border rounded">
-                            <div className="flex-1">
-                              <span className="text-sm">{verification.item}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`ok_${index}_${vIndex}`}
-                                  checked={verification.status === 'OK'}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      updateVerification(index, vIndex, 'status', 'OK');
-                                    }
-                                  }}
-                                />
-                                <Label htmlFor={`ok_${index}_${vIndex}`} className="text-xs">OK</Label>
+                        {generatorData.verificacoes.map((verification, vIndex) => {
+                          // Lógica especial para "Teste de carga 5min"
+                          if (verification.item === 'Teste de carga 5min') {
+                            return (
+                              <div key={vIndex} className="space-y-3 p-3 border rounded bg-blue-50">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1">
+                                    <span className="text-sm font-medium">{verification.item}</span>
+                                  </div>
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`ok_${index}_${vIndex}`}
+                                        checked={verification.status === 'OK'}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            updateVerification(index, vIndex, 'status', 'OK');
+                                          }
+                                        }}
+                                      />
+                                      <Label htmlFor={`ok_${index}_${vIndex}`} className="text-xs">OK</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`com_carga_${index}_${vIndex}`}
+                                        checked={verification.status === 'Com carga'}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            updateVerification(index, vIndex, 'status', 'Com carga');
+                                          }
+                                        }}
+                                      />
+                                      <Label htmlFor={`com_carga_${index}_${vIndex}`} className="text-xs">Com carga</Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <Checkbox
+                                        id={`obs_${index}_${vIndex}`}
+                                        checked={verification.status === 'OBS'}
+                                        onCheckedChange={(checked) => {
+                                          if (checked) {
+                                            updateVerification(index, vIndex, 'status', 'OBS');
+                                          }
+                                        }}
+                                      />
+                                      <Label htmlFor={`obs_${index}_${vIndex}`} className="text-xs">OBS</Label>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Campos de corrente quando "Com carga" é selecionado */}
+                                {verification.status === 'Com carga' && (
+                                  <div className="grid grid-cols-2 gap-3 mt-3 p-3 bg-white rounded border">
+                                    <div>
+                                      <Label htmlFor={`corrente_r_${index}`} className="text-xs">Corrente R</Label>
+                                      <Input
+                                        id={`corrente_r_${index}`}
+                                        value={generatorData.corrente_r || ''}
+                                        onChange={(e) => updateGeneratorData(index, 'corrente_r', e.target.value)}
+                                        placeholder="Amperes"
+                                        className="text-xs"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor={`corrente_s_${index}`} className="text-xs">Corrente S</Label>
+                                      <Input
+                                        id={`corrente_s_${index}`}
+                                        value={generatorData.corrente_s || ''}
+                                        onChange={(e) => updateGeneratorData(index, 'corrente_s', e.target.value)}
+                                        placeholder="Amperes"
+                                        className="text-xs"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor={`corrente_t_${index}`} className="text-xs">Corrente T</Label>
+                                      <Input
+                                        id={`corrente_t_${index}`}
+                                        value={generatorData.corrente_t || ''}
+                                        onChange={(e) => updateGeneratorData(index, 'corrente_t', e.target.value)}
+                                        placeholder="Amperes"
+                                        className="text-xs"
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor={`corrente_geral_${index}`} className="text-xs">Corrente geral</Label>
+                                      <Input
+                                        id={`corrente_geral_${index}`}
+                                        value={generatorData.corrente_geral || ''}
+                                        onChange={(e) => updateGeneratorData(index, 'corrente_geral', e.target.value)}
+                                        placeholder="Amperes"
+                                        className="text-xs"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {verification.status === 'OBS' && (
+                                  <Input
+                                    placeholder="Observação"
+                                    value={verification.observacao || ''}
+                                    onChange={(e) => updateVerification(index, vIndex, 'observacao', e.target.value)}
+                                    className="w-full text-xs mt-2"
+                                  />
+                                )}
                               </div>
-                              <div className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`obs_${index}_${vIndex}`}
-                                  checked={verification.status === 'OBS'}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      updateVerification(index, vIndex, 'status', 'OBS');
-                                    }
-                                  }}
-                                />
-                                <Label htmlFor={`obs_${index}_${vIndex}`} className="text-xs">OBS</Label>
+                            );
+                          }
+                          
+                          // Renderização padrão para outros itens
+                          return (
+                            <div key={vIndex} className="flex items-center gap-3 p-2 border rounded">
+                              <div className="flex-1">
+                                <span className="text-sm">{verification.item}</span>
                               </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`ok_${index}_${vIndex}`}
+                                    checked={verification.status === 'OK'}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        updateVerification(index, vIndex, 'status', 'OK');
+                                      }
+                                    }}
+                                  />
+                                  <Label htmlFor={`ok_${index}_${vIndex}`} className="text-xs">OK</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`obs_${index}_${vIndex}`}
+                                    checked={verification.status === 'OBS'}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        updateVerification(index, vIndex, 'status', 'OBS');
+                                      }
+                                    }}
+                                  />
+                                  <Label htmlFor={`obs_${index}_${vIndex}`} className="text-xs">OBS</Label>
+                                </div>
+                              </div>
+                              {verification.status === 'OBS' && (
+                                <Input
+                                  placeholder="Observação"
+                                  value={verification.observacao || ''}
+                                  onChange={(e) => updateVerification(index, vIndex, 'observacao', e.target.value)}
+                                  className="w-40 text-xs"
+                                />
+                              )}
                             </div>
-                            {verification.status === 'OBS' && (
-                              <Input
-                                placeholder="Observação"
-                                value={verification.observacao || ''}
-                                onChange={(e) => updateVerification(index, vIndex, 'observacao', e.target.value)}
-                                className="w-40 text-xs"
-                              />
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 

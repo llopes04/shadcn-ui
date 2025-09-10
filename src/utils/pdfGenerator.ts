@@ -315,6 +315,14 @@ const addGeneratorInfo = (pdf: jsPDF, generator: Generator, generatorData: Gener
       yPosition += 4;
     }
     
+    if (generatorData.queda_tensao_bateria) {
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Queda de Tensão da Bateria:', 25, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`${generatorData.queda_tensao_bateria}V`, 95, yPosition);
+      yPosition += 4;
+    }
+    
     if (generatorData.temperatura_agua) {
       pdf.setFont('helvetica', 'bold');
       pdf.text('Temperatura da Água:', 25, yPosition);
@@ -351,16 +359,57 @@ const addGeneratorInfo = (pdf: jsPDF, generator: Generator, generatorData: Gener
     pdf.setFont('helvetica', 'normal');
 
     generatorData.verificacoes.forEach((verificacao) => {
-      const statusColor = verificacao.status === 'OK' ? [39, 174, 96] : [230, 126, 34];
+      const statusColor = verificacao.status === 'OK' ? [39, 174, 96] : 
+                         verificacao.status === 'Com carga' ? [52, 152, 219] : [230, 126, 34];
       pdf.setTextColor(...statusColor);
       pdf.setFont('helvetica', 'bold');
+      
+      // Diminuir fonte para "Com carga"
+      if (verificacao.status === 'Com carga') {
+        pdf.setFontSize(7);
+      } else {
+        pdf.setFontSize(9);
+      }
+      
       pdf.text(`[${verificacao.status}]`, 25, yPosition);
+      pdf.setFontSize(9); // Restaurar tamanho padrão
       
       pdf.setTextColor(44, 62, 80);
       pdf.setFont('helvetica', 'normal');
       pdf.text(verificacao.item, 40, yPosition);
       
-      yPosition += 4;
+      yPosition += 6;
+      
+      // Adicionar campos de corrente se for "Teste de carga 5min" com status "Com carga"
+      if (verificacao.item === 'Teste de carga 5min' && verificacao.status === 'Com carga') {
+        if (generatorData.corrente_r || generatorData.corrente_s || generatorData.corrente_t || generatorData.corrente_geral) {
+          pdf.setTextColor(44, 62, 80);
+          pdf.setFontSize(8);
+          pdf.setFont('helvetica', 'bold');
+          pdf.text('Dados de Corrente:', 30, yPosition);
+          yPosition += 5;
+          
+          pdf.setFont('helvetica', 'normal');
+          if (generatorData.corrente_r) {
+            pdf.text(`Corrente R: ${generatorData.corrente_r}A`, 35, yPosition);
+            yPosition += 4;
+          }
+          if (generatorData.corrente_s) {
+            pdf.text(`Corrente S: ${generatorData.corrente_s}A`, 35, yPosition);
+            yPosition += 4;
+          }
+          if (generatorData.corrente_t) {
+            pdf.text(`Corrente T: ${generatorData.corrente_t}A`, 35, yPosition);
+            yPosition += 4;
+          }
+          if (generatorData.corrente_geral) {
+            pdf.text(`Corrente Geral: ${generatorData.corrente_geral}A`, 35, yPosition);
+            yPosition += 4;
+          }
+          pdf.setFontSize(9);
+          yPosition += 3;
+        }
+      }
       
       if (verificacao.observacao) {
         pdf.setTextColor(127, 140, 141);

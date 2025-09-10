@@ -44,6 +44,11 @@ export interface GeneratorData {
   pressao_oleo?: string;
   nivel_combustivel?: string;
   tempo_funcionamento?: string;
+  // Novos campos de corrente
+  corrente_r?: string;
+  corrente_s?: string;
+  corrente_t?: string;
+  corrente_geral?: string;
   verificacoes: Verification[];
   observacoes?: string;
 }

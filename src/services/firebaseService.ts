@@ -322,12 +322,21 @@ export const authService = {
 
 // Serviço de sincronização entre localStorage e Firebase
 export const syncService = {
-  // Sincronizar dados do localStorage para Firebase
+  // Sincronizar dados do localStorage para Firebase (apenas novos dados)
   async syncToFirebase() {
     checkFirebaseConfig();
     
     try {
       console.log('🚀 Iniciando sincronização para Firebase...');
+      
+      // Buscar dados existentes no Firebase para comparação
+      const firebaseClients = await clientService.getAll();
+      const firebaseOrders = await serviceOrderService.getAll();
+      
+      console.log('📊 Dados existentes no Firebase:', {
+        clientes: firebaseClients.length,
+        ordens: firebaseOrders.length
+      });
       
       // Sincronizar clientes
       const localClients = JSON.parse(localStorage.getItem('clients') || '[]') as Client[];
@@ -335,11 +344,19 @@ export const syncService = {
       
       let clientsUploaded = 0;
       for (const client of localClients) {
-        if (client.id && !client.id.includes('firebase_')) {
+        // Verificar se o cliente já existe no Firebase (por email)
+        const existsInFirebase = firebaseClients.some(fc => 
+          fc.email === client.email || 
+          (fc.nome === client.nome && fc.telefone === client.telefone)
+        );
+        
+        if (!existsInFirebase && client.id && !client.id.includes('firebase_')) {
           const { id, ...clientData } = client;
-          console.log('📤 Enviando cliente:', client.nome);
+          console.log('📤 Enviando cliente novo:', client.nome);
           await clientService.create(clientData);
           clientsUploaded++;
+        } else if (existsInFirebase) {
+          console.log('⏭️ Cliente já existe no Firebase:', client.nome);
         }
       }
 
@@ -349,17 +366,30 @@ export const syncService = {
       
       let ordersUploaded = 0;
       for (const order of localOrders) {
-        if (order.id && !order.id.includes('firebase_')) {
+        // Verificar se a ordem já existe no Firebase (por combinação de campos únicos)
+        const existsInFirebase = firebaseOrders.some(fo => 
+          fo.tecnico === order.tecnico && 
+          fo.data === order.data && 
+          fo.cliente_nome === order.cliente_nome &&
+          fo.equipamento === order.equipamento
+        );
+        
+        if (!existsInFirebase && order.id && !order.id.includes('firebase_')) {
           const { id, ...orderData } = order;
-          console.log('📤 Enviando ordem:', order.id);
+          console.log('📤 Enviando ordem nova:', `${order.tecnico} - ${order.data}`);
           await serviceOrderService.create(orderData);
           ordersUploaded++;
+        } else if (existsInFirebase) {
+          console.log('⏭️ Ordem já existe no Firebase:', `${order.tecnico} - ${order.data}`);
         }
       }
 
+      const skippedClients = localClients.length - clientsUploaded;
+      const skippedOrders = localOrders.length - ordersUploaded;
+      
       return { 
         success: true, 
-        message: `Sincronização concluída! ${clientsUploaded} clientes e ${ordersUploaded} ordens enviadas.` 
+        message: `Sincronização concluída! ${clientsUploaded} clientes e ${ordersUploaded} ordens enviadas. ${skippedClients + skippedOrders > 0 ? `(${skippedClients} clientes e ${skippedOrders} ordens já existiam)` : ''}` 
       };
     } catch (error) {
       console.error('❌ Erro na sincronização:', error);
@@ -416,11 +446,28 @@ export const syncService = {
       const firebaseClients = await clientService.getAll();
       const localClients = JSON.parse(localStorage.getItem('clients') || '[]') as Client[];
       
+      console.log('📊 Dados para mesclagem:', {
+        clientesFirebase: firebaseClients.length,
+        clientesLocais: localClients.length
+      });
+      
       // Mesclar dados (Firebase tem prioridade)
       const mergedClients = [...firebaseClients];
+      let addedClients = 0;
+      
       localClients.forEach(localClient => {
-        if (!firebaseClients.find(fc => fc.nome === localClient.nome && fc.email === localClient.email)) {
+        // Usar a mesma lógica de detecção de duplicatas melhorada
+        const existsInFirebase = firebaseClients.some(fc => 
+          fc.email === localClient.email || 
+          (fc.nome === localClient.nome && fc.telefone === localClient.telefone)
+        );
+        
+        if (!existsInFirebase) {
           mergedClients.push(localClient);
+          addedClients++;
+          console.log('➕ Cliente local adicionado:', localClient.nome);
+        } else {
+          console.log('⏭️ Cliente local já existe no Firebase:', localClient.nome);
         }
       });
       
@@ -430,11 +477,30 @@ export const syncService = {
       const firebaseOrders = await serviceOrderService.getAll();
       const localOrders = JSON.parse(localStorage.getItem('serviceOrders') || '[]') as ServiceOrder[];
       
+      console.log('📊 Ordens para mesclagem:', {
+        ordensFirebase: firebaseOrders.length,
+        ordensLocais: localOrders.length
+      });
+      
       // Mesclar dados (Firebase tem prioridade)
       const mergedOrders = [...firebaseOrders];
+      let addedOrders = 0;
+      
       localOrders.forEach(localOrder => {
-        if (!firebaseOrders.find(fo => fo.tecnico === localOrder.tecnico && fo.data === localOrder.data)) {
+        // Usar a mesma lógica de detecção de duplicatas melhorada
+        const existsInFirebase = firebaseOrders.some(fo => 
+          fo.tecnico === localOrder.tecnico && 
+          fo.data === localOrder.data && 
+          fo.cliente_nome === localOrder.cliente_nome &&
+          fo.equipamento === localOrder.equipamento
+        );
+        
+        if (!existsInFirebase) {
           mergedOrders.push(localOrder);
+          addedOrders++;
+          console.log('➕ Ordem local adicionada:', `${localOrder.tecnico} - ${localOrder.data}`);
+        } else {
+          console.log('⏭️ Ordem local já existe no Firebase:', `${localOrder.tecnico} - ${localOrder.data}`);
         }
       });
       
@@ -442,7 +508,7 @@ export const syncService = {
 
       return { 
         success: true, 
-        message: `Dados mesclados! ${mergedClients.length} clientes e ${mergedOrders.length} ordens totais.` 
+        message: `Dados mesclados! ${mergedClients.length} clientes e ${mergedOrders.length} ordens totais. (${addedClients} clientes e ${addedOrders} ordens locais adicionadas)` 
       };
     } catch (error) {
       console.error('❌ Erro ao mesclar dados:', error);

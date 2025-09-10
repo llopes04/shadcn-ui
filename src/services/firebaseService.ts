@@ -557,35 +557,10 @@ export const syncService = {
       const orderByKey = new Map<string, { id: string }>();
       firebaseOrders.forEach(o => orderByKey.set(orderKey(o), { id: o.id }));
       
-      // Buscar dados existentes no Firebase para comparação
-      const firebaseClients = await clientService.getAll();
-      const firebaseOrders = await serviceOrderService.getAll();
-      
-      console.log('📊 Dados existentes no Firebase:', {
-        clientes: firebaseClients.length,
-        ordens: firebaseOrders.length
-      });
-      
       // Sincronizar clientes
       const localClients = JSON.parse(localStorage.getItem('clients') || '[]') as Client[];
       console.log('📊 Clientes locais encontrados:', localClients.length);
       let clientsUploaded = 0;
-<<<<<<< HEAD
-      for (const client of localClients) {
-        // Verificar se o cliente já existe no Firebase (por email)
-        const existsInFirebase = firebaseClients.some(fc => 
-          fc.email === client.email || 
-          (fc.nome === client.nome && fc.telefone === client.telefone)
-        );
-        
-        if (!existsInFirebase && client.id && !client.id.includes('firebase_')) {
-          const { id, ...clientData } = client;
-          console.log('📤 Enviando cliente novo:', client.nome);
-          await clientService.create(clientData);
-          clientsUploaded++;
-        } else if (existsInFirebase) {
-          console.log('⏭️ Cliente já existe no Firebase:', client.nome);
-=======
       let clientsLinked = 0;
       
       for (let i = 0; i < localClients.length; i++) {
@@ -596,7 +571,6 @@ export const syncService = {
         if (client.id && client.id.includes('firebase_')) {
           // Já sincronizado
           continue;
->>>>>>> 05121a6b2af1befa4792eef77e7fa3cf56f11483
         }
 
         // Se já existe no Firebase por nome, apenas vincular e marcar localmente
@@ -621,24 +595,6 @@ export const syncService = {
       const localOrders = JSON.parse(localStorage.getItem('serviceOrders') || '[]') as ServiceOrder[];
       console.log('📊 Ordens locais encontradas:', localOrders.length);
       let ordersUploaded = 0;
-<<<<<<< HEAD
-      for (const order of localOrders) {
-        // Verificar se a ordem já existe no Firebase (por combinação de campos únicos)
-        const existsInFirebase = firebaseOrders.some(fo => 
-          fo.tecnico === order.tecnico && 
-          fo.data === order.data && 
-          fo.cliente_nome === order.cliente_nome &&
-          fo.equipamento === order.equipamento
-        );
-        
-        if (!existsInFirebase && order.id && !order.id.includes('firebase_')) {
-          const { id, ...orderData } = order;
-          console.log('📤 Enviando ordem nova:', `${order.tecnico} - ${order.data}`);
-          await serviceOrderService.create(orderData);
-          ordersUploaded++;
-        } else if (existsInFirebase) {
-          console.log('⏭️ Ordem já existe no Firebase:', `${order.tecnico} - ${order.data}`);
-=======
       let ordersLinked = 0;
       
       for (let i = 0; i < localOrders.length; i++) {
@@ -647,7 +603,6 @@ export const syncService = {
         if (order.id && order.id.includes('firebase_')) {
           // Já sincronizada
           continue;
->>>>>>> 05121a6b2af1befa4792eef77e7fa3cf56f11483
         }
 
         const key = orderKey(order);
@@ -703,16 +658,9 @@ export const syncService = {
         summary.push(`${usersUploaded} usuários enviados` + (usersLinked ? `, ${usersLinked} vinculados` : ''));
       }
 
-      const skippedClients = localClients.length - clientsUploaded;
-      const skippedOrders = localOrders.length - ordersUploaded;
-      
       return { 
         success: true, 
-<<<<<<< HEAD
-        message: `Sincronização concluída! ${clientsUploaded} clientes e ${ordersUploaded} ordens enviadas. ${skippedClients + skippedOrders > 0 ? `(${skippedClients} clientes e ${skippedOrders} ordens já existiam)` : ''}` 
-=======
         message: `Sincronização concluída! ${summary.join(' · ')}` 
->>>>>>> 05121a6b2af1befa4792eef77e7fa3cf56f11483
       };
     } catch (error) {
       console.error('❌ Erro na sincronização:', error);
@@ -779,17 +727,7 @@ export const syncService = {
       let addedClients = 0;
       
       localClients.forEach(localClient => {
-<<<<<<< HEAD
-        // Usar a mesma lógica de detecção de duplicatas melhorada
-        const existsInFirebase = firebaseClients.some(fc => 
-          fc.email === localClient.email || 
-          (fc.nome === localClient.nome && fc.telefone === localClient.telefone)
-        );
-        
-        if (!existsInFirebase) {
-=======
         if (!firebaseClients.find(fc => fc.nome === localClient.nome)) {
->>>>>>> 05121a6b2af1befa4792eef77e7fa3cf56f11483
           mergedClients.push(localClient);
           addedClients++;
           console.log('➕ Cliente local adicionado:', localClient.nome);

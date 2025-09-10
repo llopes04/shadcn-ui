@@ -277,11 +277,7 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                               )
                               .map((generator) => (
                                 <SelectItem key={generator.id} value={generator.id}>
-<<<<<<< HEAD
                                   {generator.gerador} - Série Motor: {generator.serie_motor}
-=======
-                                  {generator.modelo_gerador} - {generator.serie_motor}
->>>>>>> 05121a6b2af1befa4792eef77e7fa3cf56f11483
                                 </SelectItem>
                               ))
                             }
@@ -384,20 +380,12 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                           />
                         </div>
                         <div>
-<<<<<<< HEAD
-                          <Label htmlFor={`queda_tensao_bateria_${index}`}>Queda de tensão da bateria</Label>
-=======
                           <Label htmlFor={`queda_tensao_bateria_${index}`}>Queda de Tensão da Bateria (V)</Label>
->>>>>>> 05121a6b2af1befa4792eef77e7fa3cf56f11483
                           <Input
                             id={`queda_tensao_bateria_${index}`}
                             value={generatorData.queda_tensao_bateria || ''}
                             onChange={(e) => updateGeneratorData(index, 'queda_tensao_bateria', e.target.value)}
-<<<<<<< HEAD
-                            placeholder="Digite a queda de tensão"
-=======
                             placeholder="0.5"
->>>>>>> 05121a6b2af1befa4792eef77e7fa3cf56f11483
                           />
                         </div>
                         <div>
@@ -443,7 +431,6 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                     <div>
                       <h4 className="font-medium mb-2">Verificações</h4>
                       <div className="space-y-2 max-h-60 overflow-y-auto">
-<<<<<<< HEAD
                         {generatorData.verificacoes.map((verification, vIndex) => {
                           // Lógica especial para "Teste de carga 5min"
                           if (verification.item === 'Teste de carga 5min') {
@@ -556,31 +543,6 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                             <div key={vIndex} className="flex items-center gap-3 p-2 border rounded">
                               <div className="flex-1">
                                 <span className="text-sm">{verification.item}</span>
-=======
-                        {generatorData.verificacoes.map((verification, vIndex) => (
-                          <div key={vIndex} className="p-2 border rounded">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="flex-1">
-                                <span className="text-sm">{verification.item}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`ok_${index}_${vIndex}`}
-                                    checked={verification.status === 'OK'}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        updateVerification(index, vIndex, 'status', 'OK');
-                                      }
-                                    }}
-                                  />
-                                  <Label htmlFor={`ok_${index}_${vIndex}`} className="text-xs">OK</Label>
-                                </div>
-                                {verification.item === 'Teste de carga 5min' && (
-                                  <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id={`com_carga_${index}_${vIndex}`}
-                                      checked={verification.status === 'COM_CARGA'}
                                       onCheckedChange={(checked) => {
                                         if (checked) {
                                           updateVerification(index, vIndex, 'status', 'COM_CARGA');
@@ -602,7 +564,6 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                                   />
                                   <Label htmlFor={`obs_${index}_${vIndex}`} className="text-xs">OBS</Label>
                                 </div>
->>>>>>> 05121a6b2af1befa4792eef77e7fa3cf56f11483
                               </div>
                               <div className="flex items-center gap-2">
                                 <div className="flex items-center space-x-2">
@@ -639,29 +600,8 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                                 />
                               )}
                             </div>
-<<<<<<< HEAD
                           );
                         })}
-=======
-                            {verification.status === 'OBS' && (
-                              <Input
-                                placeholder="Observação"
-                                value={verification.observacao || ''}
-                                onChange={(e) => updateVerification(index, vIndex, 'observacao', e.target.value)}
-                                className="w-full text-xs mt-2"
-                              />
-                            )}
-                            {verification.item === 'Teste de carga 5min' && verification.status === 'COM_CARGA' && (
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
-                                <div>
-                                  <Label htmlFor={`corrente_r_${index}_${vIndex}`} className="text-xs">Corrente R (A)</Label>
-                                  <Input
-                                    id={`corrente_r_${index}_${vIndex}`}
-                                    value={verification.corrente_r || ''}
-                                    onChange={(e) => updateVerification(index, vIndex, 'corrente_r', e.target.value)}
-                                    placeholder="0.0"
-                                    className="text-xs"
-                                  />
                                 </div>
                                 <div>
                                   <Label htmlFor={`corrente_s_${index}_${vIndex}`} className="text-xs">Corrente S (A)</Label>
@@ -697,7 +637,6 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                             )}
                           </div>
                         ))}
->>>>>>> 05121a6b2af1befa4792eef77e7fa3cf56f11483
                       </div>
                     </div>
 

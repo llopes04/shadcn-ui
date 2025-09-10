@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,25 @@ export default function OrdersList() {
   const [showRTIForm, setShowRTIForm] = useState(false);
   const [selectedRTI, setSelectedRTI] = useState<RTI | null>(null);
   const [showRTIDetails, setShowRTIDetails] = useState(false);
+
+  // Carregar dados do Firebase quando o componente for montado
+  useEffect(() => {
+    const loadFirebaseData = async () => {
+      if (!currentUser) return;
+      
+      try {
+        // Carregar ordens de serviço do Firebase
+        const firebaseOrders = await serviceOrderService.getAll();
+        if (firebaseOrders.length > 0) {
+          setServiceOrders(firebaseOrders);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar ordens de serviço do Firebase:', error);
+      }
+    };
+
+    loadFirebaseData();
+  }, [currentUser, setServiceOrders]);
 
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);

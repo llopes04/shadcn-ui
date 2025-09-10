@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -8,6 +9,26 @@ import { clientService } from '@/services/firebaseService';
 export default function Clients() {
   const navigate = useNavigate();
   const [clients, setClients] = useLocalStorage<Client[]>('clients', []);
+  const [currentUser] = useLocalStorage('currentUser', null);
+
+  // Carregar dados do Firebase quando o componente for montado
+  useEffect(() => {
+    const loadFirebaseData = async () => {
+      if (!currentUser) return;
+      
+      try {
+        // Carregar clientes do Firebase
+        const firebaseClients = await clientService.getAll();
+        if (firebaseClients.length > 0) {
+          setClients(firebaseClients);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar clientes do Firebase:', error);
+      }
+    };
+
+    loadFirebaseData();
+  }, [currentUser, setClients]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {

@@ -173,7 +173,13 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
         if (isFirebaseConfigured()) {
           try {
             const { id: _omit, ...orderData } = newOrder;
-            const firebaseId = await serviceOrderService.create(orderData);
+            
+            // Remover campos undefined antes de enviar para o Firebase
+            const cleanOrderData = Object.fromEntries(
+              Object.entries(orderData).filter(([_, value]) => value !== undefined)
+            );
+            
+            const firebaseId = await serviceOrderService.create(cleanOrderData);
             
             // Atualizar o ID local com referência do Firebase
             const orderWithFirebaseId = { ...newOrder, id: `firebase_${firebaseId}` };

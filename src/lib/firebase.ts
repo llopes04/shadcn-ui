@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
@@ -54,7 +54,10 @@ const initializeFirebase = () => {
       auth = getAuth(app);
       storage = getStorage(app);
       
+      // Firebase inicializado com configurações padrão
+      
       console.log('Firebase inicializado com sucesso');
+      console.log('Projeto Firebase:', config.projectId);
       return true;
     } else {
       console.warn('Firebase não configurado. Configure as credenciais primeiro.');
@@ -62,6 +65,7 @@ const initializeFirebase = () => {
     }
   } catch (error) {
     console.error('Erro ao inicializar Firebase:', error);
+    console.error('Detalhes do erro:', error.message);
     return false;
   }
 };
@@ -80,5 +84,5 @@ export const reinitializeFirebase = () => {
 // Inicializar na primeira carga
 initializeFirebase();
 
-export { db, auth, storage };
+export { db, auth, storage, initializeFirebase };
 export default app;

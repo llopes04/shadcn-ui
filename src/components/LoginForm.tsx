@@ -20,7 +20,7 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
   
   const [formData, setFormData] = useState({
     nome: '',
-    email: '',
+    usuario: '',
     password: '',
     telefone: ''
   });
@@ -38,8 +38,8 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
       return;
     }
 
-    if (!formData.email || !formData.password) {
-      setMessage({ type: 'error', text: 'Email e senha são obrigatórios.' });
+    if (!formData.usuario || !formData.password) {
+      setMessage({ type: 'error', text: 'Usuário e senha são obrigatórios.' });
       return;
     }
 
@@ -54,7 +54,7 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
     try {
       if (isLogin) {
         console.log('🔐 Tentando fazer login...');
-        const result = await authService.login(formData.email, formData.password);
+        const result = await authService.login(formData.usuario, formData.password);
         
         if (result.success) {
           setMessage({ type: 'success', text: `Bem-vindo, ${result.user?.nome}!` });
@@ -68,15 +68,15 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
         console.log('📝 Tentando cadastrar usuário...');
         const result = await authService.register({
           nome: formData.nome,
-          email: formData.email,
-          password: formData.password,
+          usuario: formData.usuario,
+          senha: formData.password,
           telefone: formData.telefone
         });
         
         if (result.success) {
           setMessage({ type: 'success', text: 'Usuário cadastrado com sucesso! Faça login.' });
           setIsLogin(true);
-          setFormData({ nome: '', email: '', password: '', telefone: '' });
+          setFormData({ nome: '', usuario: '', password: '', telefone: '' });
         } else {
           setMessage({ type: 'error', text: result.message || 'Erro no cadastro' });
         }
@@ -138,13 +138,13 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
             )}
 
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="usuario">Usuário</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="Digite seu email"
+                id="usuario"
+                type="text"
+                value={formData.usuario}
+                onChange={(e) => handleInputChange('usuario', e.target.value)}
+                placeholder="Digite seu usuário"
                 disabled={!isConfigured}
               />
             </div>
@@ -213,7 +213,7 @@ export default function LoginForm({ onLoginSuccess }: LoginFormProps) {
               onClick={() => {
                 setIsLogin(!isLogin);
                 setMessage(null);
-                setFormData({ nome: '', email: '', password: '', telefone: '' });
+                setFormData({ nome: '', usuario: '', password: '', telefone: '' });
               }}
               disabled={!isConfigured}
             >

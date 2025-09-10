@@ -315,6 +315,14 @@ const addGeneratorInfo = (pdf: jsPDF, generator: Generator, generatorData: Gener
       yPosition += 4;
     }
     
+    if (generatorData.queda_tensao_bateria) {
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Queda de Tensão da Bateria:', 25, yPosition);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`${generatorData.queda_tensao_bateria}V`, 95, yPosition);
+      yPosition += 4;
+    }
+    
     if (generatorData.temperatura_agua) {
       pdf.setFont('helvetica', 'bold');
       pdf.text('Temperatura da Água:', 25, yPosition);
@@ -351,24 +359,112 @@ const addGeneratorInfo = (pdf: jsPDF, generator: Generator, generatorData: Gener
     pdf.setFont('helvetica', 'normal');
 
     generatorData.verificacoes.forEach((verificacao) => {
-      const statusColor = verificacao.status === 'OK' ? [39, 174, 96] : [230, 126, 34];
-      pdf.setTextColor(...statusColor);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`[${verificacao.status}]`, 25, yPosition);
-      
-      pdf.setTextColor(44, 62, 80);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(verificacao.item, 40, yPosition);
-      
-      yPosition += 4;
-      
-      if (verificacao.observacao) {
-        pdf.setTextColor(127, 140, 141);
+      // Para o campo "Teste de carga 5min" com status "COM_CARGA", ajustar o layout
+      if (verificacao.item === 'Teste de carga 5min' && verificacao.status === 'COM_CARGA') {
+        // Exibir o status e nome do campo na mesma linha
+        const statusColor = [230, 126, 34]; // Cor para COM_CARGA
+        pdf.setTextColor(...statusColor);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`(${verificacao.status})`, 25, yPosition);
+        
+        pdf.setTextColor(44, 62, 80);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(verificacao.item, 25 + pdf.getTextWidth(`(${verificacao.status}) `), yPosition);
+        
+        yPosition += 6;
+        
+        // Adicionar observação se existir
+        if (verificacao.observacao) {
+          pdf.setTextColor(127, 140, 141);
+          pdf.setFontSize(8);
+          const obsLines = pdf.splitTextToSize(`Obs: ${verificacao.observacao}`, 150);
+          pdf.text(obsLines, 30, yPosition);
+          yPosition += obsLines.length * 3 + 2;
+          pdf.setFontSize(9);
+        }
+        
+        // Adicionar campos de corrente em uma seção separada
+        pdf.setTextColor(44, 62, 80);
         pdf.setFontSize(8);
-        const obsLines = pdf.splitTextToSize(`Obs: ${verificacao.observacao}`, 150);
-        pdf.text(obsLines, 30, yPosition);
-        yPosition += obsLines.length * 3 + 2;
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Dados de Corrente:', 30, yPosition);
+        yPosition += 5;
+        
+        pdf.setFont('helvetica', 'normal');
+        
+        // Organizar os campos de corrente em duas colunas para economizar espaço
+        let currentY = yPosition;
+        let leftColumn = true;
+        
+        if (verificacao.corrente_r) {
+          const xPos = leftColumn ? 35 : 110;
+          pdf.text(`Corrente R: ${verificacao.corrente_r}A`, xPos, currentY);
+          if (leftColumn) {
+            leftColumn = false;
+          } else {
+            currentY += 4;
+            leftColumn = true;
+          }
+        }
+        
+        if (verificacao.corrente_s) {
+          const xPos = leftColumn ? 35 : 110;
+          pdf.text(`Corrente S: ${verificacao.corrente_s}A`, xPos, currentY);
+          if (leftColumn) {
+            leftColumn = false;
+          } else {
+            currentY += 4;
+            leftColumn = true;
+          }
+        }
+        
+        if (verificacao.corrente_t) {
+          const xPos = leftColumn ? 35 : 110;
+          pdf.text(`Corrente T: ${verificacao.corrente_t}A`, xPos, currentY);
+          if (leftColumn) {
+            leftColumn = false;
+          } else {
+            currentY += 4;
+            leftColumn = true;
+          }
+        }
+        
+        if (verificacao.corrente_geral) {
+          const xPos = leftColumn ? 35 : 110;
+          pdf.text(`Corrente Geral: ${verificacao.corrente_geral}A`, xPos, currentY);
+          if (leftColumn) {
+            leftColumn = false;
+          } else {
+            currentY += 4;
+            leftColumn = true;
+          }
+        }
+        
+        // Ajustar yPosition para a próxima linha
+        yPosition = currentY + (leftColumn ? 0 : 4) + 3;
         pdf.setFontSize(9);
+        
+      } else {
+        // Layout padrão para outros campos
+        const statusColor = verificacao.status === 'OK' ? [39, 174, 96] : [230, 126, 34];
+        pdf.setTextColor(...statusColor);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`[${verificacao.status}]`, 25, yPosition);
+        
+        pdf.setTextColor(44, 62, 80);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(verificacao.item, 40, yPosition);
+        
+        yPosition += 4;
+        
+        if (verificacao.observacao) {
+          pdf.setTextColor(127, 140, 141);
+          pdf.setFontSize(8);
+          const obsLines = pdf.splitTextToSize(`Obs: ${verificacao.observacao}`, 150);
+          pdf.text(obsLines, 30, yPosition);
+          yPosition += obsLines.length * 3 + 2;
+          pdf.setFontSize(9);
+        }
       }
 
       yPosition += 2;

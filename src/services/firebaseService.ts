@@ -120,28 +120,14 @@ export const userService = {
     console.log('👥 Usuários encontrados:', users.length);
     console.log('📊 Lista de usuários:', users.map(u => ({
       id: u.id,
-      email: u.email,
-      nome: u.nome
+      nome: u.nome,
+      usuario: u.usuario
     })));
     
     return users;
   },
 
-  async getByEmail(email: string) {
-    checkFirebaseConfig();
-    const q = query(collection(db, 'users'), where('email', '==', email));
-    const querySnapshot = await getDocs(q);
-    
-    if (querySnapshot.empty) {
-      return null;
-    }
-    
-    const doc = querySnapshot.docs[0];
-    return {
-      id: doc.id,
-      ...convertTimestamps(doc.data())
-    } as User;
-  },
+  // Função removida - agora usamos getByUsuario
 
   async getByUsuario(usuario: string) {
     checkFirebaseConfig();
@@ -558,11 +544,11 @@ export const syncService = {
         userService.getAll().catch(() => []) // segurança caso coleção não exista
       ]);
 
-      const clientByEmail = new Map<string, { id: string }>();
-      firebaseClients.forEach(c => clientByEmail.set((c.email || '').toLowerCase(), { id: c.id }));
+      const clientByNome = new Map<string, { id: string }>();
+      firebaseClients.forEach(c => clientByNome.set((c.nome || '').toLowerCase(), { id: c.id }));
 
-      const userByEmail = new Map<string, { id: string }>();
-      (firebaseUsers as User[]).forEach(u => userByEmail.set((u.email as string || '').toLowerCase(), { id: u.id }));
+      const userByUsuario = new Map<string, { id: string }>();
+      (firebaseUsers as User[]).forEach(u => userByUsuario.set((u.usuario || '').toLowerCase(), { id: u.id }));
 
       const orderKey = (o: ServiceOrder) => {
         const gCount = Array.isArray(o.geradores) ? o.geradores.length : 0;
@@ -580,15 +566,15 @@ export const syncService = {
       for (let i = 0; i < localClients.length; i++) {
         const client = localClients[i];
         if (!client) continue;
-        const emailKey = (client.email || '').toLowerCase();
+        const nomeKey = (client.nome || '').toLowerCase();
         
         if (client.id && client.id.includes('firebase_')) {
           // Já sincronizado
           continue;
         }
 
-        // Se já existe no Firebase por email, apenas vincular e marcar localmente
-        const remoteClient = clientByEmail.get(emailKey);
+        // Se já existe no Firebase por nome, apenas vincular e marcar localmente
+        const remoteClient = clientByNome.get(nomeKey);
         if (remoteClient) {
           localClients[i] = { ...client, id: `firebase_${remoteClient.id}` } as Client;
           clientsLinked++;
@@ -645,10 +631,10 @@ export const syncService = {
         for (let i = 0; i < localUsers.length; i++) {
           const user = localUsers[i];
           if (!user) continue;
-          const emailKey = (user.email as string || '').toLowerCase();
+          const usuarioKey = (user.usuario || '').toLowerCase();
           if (user.id && user.id.includes('firebase_')) continue;
 
-          const remoteUser = userByEmail.get(emailKey);
+          const remoteUser = userByUsuario.get(usuarioKey);
           if (remoteUser) {
             localUsers[i] = { ...user, id: `firebase_${remoteUser.id}` } as User;
             usersLinked++;
@@ -656,7 +642,7 @@ export const syncService = {
           }
 
           const { id: _idDrop, ...userData } = user as User;
-          console.log('📤 Enviando usuário:', user.email);
+          console.log('📤 Enviando usuário:', user.usuario);
           const newUserId = await userService.create(userData as Omit<User, 'id'>);
           localUsers[i] = { ...user, id: `firebase_${newUserId}` } as User;
           usersUploaded++;
@@ -734,7 +720,7 @@ export const syncService = {
       // Mesclar dados (Firebase tem prioridade)
       const mergedClients = [...firebaseClients];
       localClients.forEach(localClient => {
-        if (!firebaseClients.find(fc => fc.nome === localClient.nome && fc.email === localClient.email)) {
+        if (!firebaseClients.find(fc => fc.nome === localClient.nome)) {
           mergedClients.push(localClient);
         }
       });

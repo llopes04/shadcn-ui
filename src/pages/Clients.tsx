@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
@@ -10,37 +10,57 @@ export default function Clients() {
   const navigate = useNavigate();
   const [clients, setClients] = useLocalStorage<Client[]>('clients', []);
   const [currentUser] = useLocalStorage('currentUser', null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Carregar dados do Firebase quando o componente for montado
+  // Carregar e sincronizar dados quando o componente for montado
   useEffect(() => {
-    const loadFirebaseData = async () => {
-      console.log('Clients: Tentando carregar dados do Firebase...');
+    const loadAndSyncData = async () => {
+      console.log('Clients: Iniciando carregamento de dados...');
       console.log('Clients: currentUser:', currentUser);
+      console.log('Clients: Clientes locais atuais:', clients.length);
       
       try {
-        // Carregar clientes do Firebase
+        // Sempre tentar carregar dados do Firebase para sincronizar
+        console.log('Clients: Tentando carregar dados do Firebase...');
         const firebaseClients = await clientService.getAll();
         console.log('Clients: Clientes carregados do Firebase:', firebaseClients.length);
         
         if (firebaseClients.length > 0) {
-          setClients(firebaseClients);
-          console.log('Clients: Clientes definidos no estado');
+          // Se há dados no Firebase, mesclar com dados locais
+          const localClients = clients;
+          const mergedClients = [...firebaseClients];
+          
+          // Adicionar clientes locais que não existem no Firebase
+          localClients.forEach(localClient => {
+            if (!localClient.id.startsWith('firebase_') && 
+                !firebaseClients.find(fc => fc.nome.toLowerCase() === localClient.nome.toLowerCase())) {
+              mergedClients.push(localClient);
+              console.log('Clients: Cliente local adicionado à lista:', localClient.nome);
+            }
+          });
+          
+          setClients(mergedClients);
+          console.log('Clients: Total de clientes após mesclagem:', mergedClients.length);
         } else {
-          console.log('Clients: Nenhum cliente encontrado no Firebase');
+          console.log('Clients: Nenhum cliente no Firebase, mantendo dados locais');
         }
       } catch (error) {
         console.error('Clients: Erro ao carregar clientes do Firebase:', error);
+        console.log('Clients: Mantendo apenas dados locais devido ao erro');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    loadFirebaseData();
-  }, [setClients]);
+    loadAndSyncData();
+  }, []); // Remover dependência de setClients para evitar loops
 
   const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
       try {
         console.log('Iniciando exclusão do cliente:', id);
         
+        // Se é um cliente do Firebase, excluir do Firebase também
         if (id.startsWith('firebase_')) {
           const remoteId = id.replace(/^firebase_/, '');
           console.log('Excluindo do Firebase com ID:', remoteId);
@@ -48,6 +68,7 @@ export default function Clients() {
           console.log('Cliente excluído do Firebase com sucesso');
         }
         
+        // Remover do localStorage
         setClients(clients.filter(client => client.id !== id));
         console.log('Cliente removido do localStorage');
         alert('Cliente excluído com sucesso!');
@@ -58,6 +79,21 @@ export default function Clients() {
       }
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-center items-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Carregando clientes...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -103,9 +139,19 @@ export default function Clients() {
                         {client.endereco && (
                           <p className="text-gray-600 text-sm">📍 {client.endereco}</p>
                         )}
+                        {(client.cidade || client.estado) && (
+                          <p className="text-gray-600 text-sm">
+                            🏙️ {[client.cidade, client.estado].filter(Boolean).join(', ')}
+                          </p>
+                        )}
                         <p className="text-sm text-blue-600 font-medium mt-2">
                           📊 {client.geradores?.length || 0} gerador(es) cadastrado(s)
                         </p>
+                        {client.id.startsWith('firebase_') && (
+                          <span className="inline-block bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full mt-1">
+                            Sincronizado
+                          </span>
+                        )}
                       </div>
                       <div className="flex gap-2">
                         <Button

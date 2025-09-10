@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { ServiceOrder, Client, RTI, Generator } from '@/types';
 import { generateServiceOrderPDF, downloadPDF } from '@/utils/pdfGenerator';
 import { sendServiceOrderEmailJS, defaultEmailJSConfig, EmailJSConfig } from '@/utils/emailJSService';
 import RTIForm from '@/components/RTIForm';
+import { serviceOrderService } from '@/services/firebaseService';
 
 interface LegacyServiceOrder extends Omit<ServiceOrder, 'geradores'> {
   gerador_id?: string;
@@ -25,6 +26,31 @@ export default function OrdersList() {
   const [showRTIForm, setShowRTIForm] = useState(false);
   const [selectedRTI, setSelectedRTI] = useState<RTI | null>(null);
   const [showRTIDetails, setShowRTIDetails] = useState(false);
+
+  // Carregar dados do Firebase quando o componente for montado
+  useEffect(() => {
+    const loadFirebaseData = async () => {
+      console.log('OrdersList: Tentando carregar dados do Firebase...');
+      console.log('OrdersList: currentUser:', currentUser);
+      
+      try {
+        // Carregar ordens de serviço do Firebase
+        const firebaseOrders = await serviceOrderService.getAll();
+        console.log('OrdersList: Ordens carregadas do Firebase:', firebaseOrders.length);
+        
+        if (firebaseOrders.length > 0) {
+          setServiceOrders(firebaseOrders);
+          console.log('OrdersList: Ordens definidas no estado');
+        } else {
+          console.log('OrdersList: Nenhuma ordem encontrada no Firebase');
+        }
+      } catch (error) {
+        console.error('OrdersList: Erro ao carregar ordens de serviço do Firebase:', error);
+      }
+    };
+
+    loadFirebaseData();
+  }, [setServiceOrders]);
 
   const getClientName = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
@@ -163,11 +189,27 @@ export default function OrdersList() {
     }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir esta ordem de serviço?')) {
-      const updatedOrders = serviceOrders.filter(order => order.id !== id);
-      setServiceOrders(updatedOrders);
-      alert('Ordem de serviço excluída com sucesso!');
+      try {
+        console.log('Iniciando exclusão da OS:', id);
+        
+        if (id.startsWith('firebase_')) {
+          const remoteId = id.replace(/^firebase_/, '');
+          console.log('Excluindo OS do Firebase com ID:', remoteId);
+          await serviceOrderService.delete(remoteId);
+          console.log('OS excluída do Firebase com sucesso');
+        }
+        
+        const updatedOrders = serviceOrders.filter(order => order.id !== id);
+        setServiceOrders(updatedOrders);
+        console.log('OS removida do localStorage');
+        alert('Ordem de serviço excluída com sucesso!');
+      } catch (e: any) {
+        console.error('Erro detalhado ao excluir OS:', e);
+        const errorMessage = e?.message || 'Erro desconhecido';
+        alert(`Falha ao excluir no Firebase: ${errorMessage}`);
+      }
     }
   };
 
@@ -552,7 +594,7 @@ export default function OrdersList() {
         {/* Modal de RTI Details */}
         {selectedOrder && showRTIDetails && selectedRTI && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <Card className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <Card className="w-full max-w-2xl max-h-[80h] overflow-y-auto">
               <CardHeader>
                 <CardTitle>RTI - OS #{selectedOrder.id.slice(-4)}</CardTitle>
                 <CardDescription>Relatório Técnico Interno - Apenas para uso técnico</CardDescription>

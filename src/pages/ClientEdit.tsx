@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Client, Generator } from '@/types';
 import GeneratorForm from '@/components/GeneratorForm';
+import { clientService } from '@/services/firebaseService';
 
 export default function ClientEdit() {
   const navigate = useNavigate();
@@ -68,8 +69,35 @@ export default function ClientEdit() {
     setShowGeneratorForm(true);
   };
 
-  const handleDeleteGenerator = (id: string) => {
-    setGeradores(prev => prev.filter(g => g.id !== id));
+  const handleDeleteGenerator = async (generatorId: string) => {
+    console.log('Iniciando exclusão do gerador:', generatorId, 'do cliente:', id);
+    
+    const updatedGenerators = geradores.filter(g => g.id !== generatorId);
+    setGeradores(updatedGenerators);
+
+    // Persistir imediatamente no localStorage para manter consistência
+    if (id) {
+      setClients(prev => prev.map(c => c.id === id ? { ...c, geradores: updatedGenerators } as Client : c));
+      console.log('Gerador removido do localStorage');
+    }
+
+    // Se o cliente já estiver sincronizado com o Firebase, refletir a alteração também lá
+    try {
+      if (id && id.startsWith('firebase_')) {
+        const remoteId = id.replace(/^firebase_/, '');
+        console.log('Atualizando cliente no Firebase com ID:', remoteId);
+        await clientService.update(remoteId, {
+          nome: formData.nome,
+          endereco: formData.endereco,
+          telefone: formData.telefone,
+          email: formData.email,
+          geradores: updatedGenerators
+        });
+      }
+    } catch (e) {
+      console.error('Erro ao atualizar cliente no Firebase após excluir gerador:', e);
+      alert('Não foi possível atualizar no Firebase. Verifique sua conexão e tente novamente.');
+    }
   };
 
   const handleCancelGenerator = () => {
@@ -201,33 +229,27 @@ export default function ClientEdit() {
                     ))}
                   </div>
                 )}
+
               </div>
 
-              <div className="flex gap-3 pt-6">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => navigate('/clients')}
-                  className="flex-1"
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" className="flex-1 bg-green-600 hover:bg-green-700">
-                  Atualizar Cliente
-                </Button>
+              <div className="flex gap-2 pt-4">
+                <Button type="submit">Salvar</Button>
+                <Button type="button" variant="outline" onClick={() => navigate('/clients')}>Cancelar</Button>
               </div>
             </form>
           </CardContent>
         </Card>
 
         {showGeneratorForm && (
-          <Card className="mb-6">
-            <GeneratorForm
-              generator={editingGenerator || undefined}
-              onSubmit={handleAddGenerator}
-              onCancel={handleCancelGenerator}
-            />
-          </Card>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="w-full max-w-2xl">
+              <GeneratorForm
+                onSubmit={handleAddGenerator}
+                onCancel={handleCancelGenerator}
+                initialData={editingGenerator || undefined}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

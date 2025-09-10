@@ -1,16 +1,61 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Client } from '@/types';
+import { clientService } from '@/services/firebaseService';
 
 export default function Clients() {
   const navigate = useNavigate();
   const [clients, setClients] = useLocalStorage<Client[]>('clients', []);
+  const [currentUser] = useLocalStorage('currentUser', null);
 
-  const handleDelete = (id: string) => {
+  // Carregar dados do Firebase quando o componente for montado
+  useEffect(() => {
+    const loadFirebaseData = async () => {
+      console.log('Clients: Tentando carregar dados do Firebase...');
+      console.log('Clients: currentUser:', currentUser);
+      
+      try {
+        // Carregar clientes do Firebase
+        const firebaseClients = await clientService.getAll();
+        console.log('Clients: Clientes carregados do Firebase:', firebaseClients.length);
+        
+        if (firebaseClients.length > 0) {
+          setClients(firebaseClients);
+          console.log('Clients: Clientes definidos no estado');
+        } else {
+          console.log('Clients: Nenhum cliente encontrado no Firebase');
+        }
+      } catch (error) {
+        console.error('Clients: Erro ao carregar clientes do Firebase:', error);
+      }
+    };
+
+    loadFirebaseData();
+  }, [setClients]);
+
+  const handleDelete = async (id: string) => {
     if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
-      setClients(clients.filter(client => client.id !== id));
+      try {
+        console.log('Iniciando exclusão do cliente:', id);
+        
+        if (id.startsWith('firebase_')) {
+          const remoteId = id.replace(/^firebase_/, '');
+          console.log('Excluindo do Firebase com ID:', remoteId);
+          await clientService.delete(remoteId);
+          console.log('Cliente excluído do Firebase com sucesso');
+        }
+        
+        setClients(clients.filter(client => client.id !== id));
+        console.log('Cliente removido do localStorage');
+        alert('Cliente excluído com sucesso!');
+      } catch (e: any) {
+        console.error('Erro detalhado ao excluir cliente:', e);
+        const errorMessage = e?.message || 'Erro desconhecido';
+        alert(`Falha ao excluir no Firebase: ${errorMessage}`);
+      }
     }
   };
 

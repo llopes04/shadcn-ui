@@ -22,9 +22,14 @@ export interface Generator {
 
 export interface Verification {
   item: string;
-  status: 'OK' | 'OBS';
+  status: 'OK' | 'OBS' | 'COM_CARGA';
   observacao?: string;
   gerador_id?: string; // Para associar verificação a um gerador específico
+  // Campos específicos para teste de carga
+  corrente_r?: string;
+  corrente_s?: string;
+  corrente_t?: string;
+  corrente_geral?: string;
 }
 
 // Dados específicos de um gerador em uma OS
@@ -39,7 +44,7 @@ export interface GeneratorData {
   kva?: string;
   tensao_bateria_standby?: string;
   tensao_bateria_carregando?: string;
-  queda_tensao_bateria?: string;
+  queda_tensao_bateria?: string; // Campo adicionado conforme solicitação
   temperatura_agua?: string;
   pressao_oleo?: string;
   nivel_combustivel?: string;

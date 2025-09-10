@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Client, Generator } from '@/types';
 import GeneratorForm from '@/components/GeneratorForm';
+import { clientService } from '@/services/firebaseService';
 
 export default function ClientForm() {
   const navigate = useNavigate();
@@ -14,24 +15,61 @@ export default function ClientForm() {
     nome: '',
     endereco: '',
     telefone: '',
-    email: ''
+    email: '',
+    cidade: '',
+    estado: ''
   });
   const [geradores, setGeradores] = useState<Generator[]>([]);
   const [showGeneratorForm, setShowGeneratorForm] = useState(false);
   const [editingGenerator, setEditingGenerator] = useState<Generator | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newClient: Client = {
-      id: Date.now().toString(),
-      ...formData,
-      geradores: [...geradores] // Garantir que é uma nova referência
-    };
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    console.log('Salvando cliente:', newClient); // Debug
-    setClients([...clients, newClient]);
-    navigate('/clients');
+    try {
+      const newClient: Client = {
+        id: Date.now().toString(),
+        ...formData,
+        geradores: [...geradores]
+      };
+
+      console.log('Salvando cliente:', newClient);
+
+      // Salvar no localStorage primeiro (para garantir que funcione mesmo sem Firebase)
+      const updatedClients = [...clients, newClient];
+      setClients(updatedClients);
+
+      // Tentar salvar no Firebase também
+      try {
+        console.log('Tentando salvar no Firebase...');
+        const { id: _localId, ...clientData } = newClient;
+        const firebaseId = await clientService.create(clientData);
+        console.log('Cliente salvo no Firebase com ID:', firebaseId);
+
+        // Atualizar o cliente local com o ID do Firebase
+        const clientWithFirebaseId = { ...newClient, id: `firebase_${firebaseId}` };
+        const updatedClientsWithFirebaseId = updatedClients.map(c => 
+          c.id === newClient.id ? clientWithFirebaseId : c
+        );
+        setClients(updatedClientsWithFirebaseId);
+        
+        alert('Cliente salvo com sucesso!');
+      } catch (firebaseError) {
+        console.error('Erro ao salvar no Firebase:', firebaseError);
+        alert('Cliente salvo localmente. Erro ao sincronizar com Firebase: ' + (firebaseError as Error).message);
+      }
+
+      navigate('/clients');
+    } catch (error) {
+      console.error('Erro ao salvar cliente:', error);
+      alert('Erro ao salvar cliente: ' + (error as Error).message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
@@ -98,6 +136,25 @@ export default function ClientForm() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Cidade</label>
+                  <Input
+                    value={formData.cidade}
+                    onChange={(e) => handleInputChange('cidade', e.target.value)}
+                    placeholder="Cidade"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Estado</label>
+                  <Input
+                    value={formData.estado}
+                    onChange={(e) => handleInputChange('estado', e.target.value)}
+                    placeholder="Estado"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Telefone</label>
                 <Input
@@ -123,7 +180,7 @@ export default function ClientForm() {
                   <Button 
                     type="button" 
                     onClick={(e) => {
-                      e.preventDefault(); // Impedir propagação do evento
+                      e.preventDefault();
                       setShowGeneratorForm(true);
                     }}
                     variant="outline"
@@ -164,7 +221,7 @@ export default function ClientForm() {
                               variant="outline"
                               size="sm"
                               onClick={(e) => {
-                                e.preventDefault(); // Impedir propagação
+                                e.preventDefault();
                                 handleEditGenerator(gerador);
                               }}
                             >
@@ -174,7 +231,7 @@ export default function ClientForm() {
                               variant="destructive"
                               size="sm"
                               onClick={(e) => {
-                                e.preventDefault(); // Impedir propagação
+                                e.preventDefault();
                                 handleDeleteGenerator(gerador.id);
                               }}
                             >
@@ -194,11 +251,16 @@ export default function ClientForm() {
                   variant="outline" 
                   onClick={() => navigate('/clients')}
                   className="flex-1"
+                  disabled={isSubmitting}
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" className="flex-1 bg-green-600 hover:bg-green-700">
-                  Salvar Cliente
+                <Button 
+                  type="submit" 
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Salvando...' : 'Salvar Cliente'}
                 </Button>
               </div>
             </form>

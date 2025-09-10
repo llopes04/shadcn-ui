@@ -543,6 +543,13 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                             <div key={vIndex} className="flex items-center gap-3 p-2 border rounded">
                               <div className="flex-1">
                                 <span className="text-sm">{verification.item}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {verification.item === 'Teste de carga 5min' && (
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`com_carga_${index}_${vIndex}`}
+                                      checked={verification.status === 'COM_CARGA'}
                                       onCheckedChange={(checked) => {
                                         if (checked) {
                                           updateVerification(index, vIndex, 'status', 'COM_CARGA');
@@ -602,41 +609,6 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
                             </div>
                           );
                         })}
-                                </div>
-                                <div>
-                                  <Label htmlFor={`corrente_s_${index}_${vIndex}`} className="text-xs">Corrente S (A)</Label>
-                                  <Input
-                                    id={`corrente_s_${index}_${vIndex}`}
-                                    value={verification.corrente_s || ''}
-                                    onChange={(e) => updateVerification(index, vIndex, 'corrente_s', e.target.value)}
-                                    placeholder="0.0"
-                                    className="text-xs"
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor={`corrente_t_${index}_${vIndex}`} className="text-xs">Corrente T (A)</Label>
-                                  <Input
-                                    id={`corrente_t_${index}_${vIndex}`}
-                                    value={verification.corrente_t || ''}
-                                    onChange={(e) => updateVerification(index, vIndex, 'corrente_t', e.target.value)}
-                                    placeholder="0.0"
-                                    className="text-xs"
-                                  />
-                                </div>
-                                <div>
-                                  <Label htmlFor={`corrente_geral_${index}_${vIndex}`} className="text-xs">Corrente Geral (A)</Label>
-                                  <Input
-                                    id={`corrente_geral_${index}_${vIndex}`}
-                                    value={verification.corrente_geral || ''}
-                                    onChange={(e) => updateVerification(index, vIndex, 'corrente_geral', e.target.value)}
-                                    placeholder="0.0"
-                                    className="text-xs"
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
                       </div>
                     </div>
 

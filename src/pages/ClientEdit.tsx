@@ -16,38 +16,77 @@ export default function ClientEdit() {
     nome: '',
     endereco: '',
     telefone: '',
-    email: ''
+    email: '',
+    cidade: '',
+    estado: ''
   });
   const [geradores, setGeradores] = useState<Generator[]>([]);
   const [showGeneratorForm, setShowGeneratorForm] = useState(false);
   const [editingGenerator, setEditingGenerator] = useState<Generator | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (id) {
       const client = clients.find(c => c.id === id);
       if (client) {
         setFormData({
-          nome: client.nome,
-          endereco: client.endereco,
-          telefone: client.telefone,
-          email: client.email
+          nome: client.nome || '',
+          endereco: client.endereco || '',
+          telefone: client.telefone || '',
+          email: client.email || '',
+          cidade: client.cidade || '',
+          estado: client.estado || ''
         });
         setGeradores(client.geradores || []);
       }
     }
   }, [id, clients]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const updatedClient: Client = {
-      id: id!,
-      ...formData,
-      geradores
-    };
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    setClients(clients.map(c => c.id === id ? updatedClient : c));
-    navigate('/clients');
+    try {
+      const updatedClient: Client = {
+        id: id!,
+        ...formData,
+        geradores
+      };
+
+      console.log('Atualizando cliente:', updatedClient);
+
+      // Atualizar no localStorage primeiro
+      const updatedClients = clients.map(c => c.id === id ? updatedClient : c);
+      setClients(updatedClients);
+
+      // Se é um cliente do Firebase, atualizar no Firebase também
+      if (id && id.startsWith('firebase_')) {
+        try {
+          const remoteId = id.replace(/^firebase_/, '');
+          console.log('Atualizando cliente no Firebase com ID:', remoteId);
+          
+          const { id: _localId, ...clientData } = updatedClient;
+          await clientService.update(remoteId, clientData);
+          console.log('Cliente atualizado no Firebase com sucesso');
+          
+          alert('Cliente atualizado com sucesso!');
+        } catch (firebaseError) {
+          console.error('Erro ao atualizar no Firebase:', firebaseError);
+          alert('Cliente atualizado localmente. Erro ao sincronizar com Firebase: ' + (firebaseError as Error).message);
+        }
+      } else {
+        alert('Cliente atualizado localmente!');
+      }
+
+      navigate('/clients');
+    } catch (error) {
+      console.error('Erro ao atualizar cliente:', error);
+      alert('Erro ao atualizar cliente: ' + (error as Error).message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: keyof typeof formData, value: string) => {
@@ -91,6 +130,8 @@ export default function ClientEdit() {
           endereco: formData.endereco,
           telefone: formData.telefone,
           email: formData.email,
+          cidade: formData.cidade,
+          estado: formData.estado,
           geradores: updatedGenerators
         });
       }
@@ -141,6 +182,25 @@ export default function ClientEdit() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Cidade</label>
+                  <Input
+                    value={formData.cidade}
+                    onChange={(e) => handleInputChange('cidade', e.target.value)}
+                    placeholder="Cidade"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Estado</label>
+                  <Input
+                    value={formData.estado}
+                    onChange={(e) => handleInputChange('estado', e.target.value)}
+                    placeholder="Estado"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Telefone</label>
                 <Input
@@ -166,7 +226,7 @@ export default function ClientEdit() {
                   <Button 
                     type="button" 
                     onClick={(e) => {
-                      e.preventDefault(); // Impedir propagação do evento
+                      e.preventDefault();
                       setShowGeneratorForm(true);
                     }}
                     variant="outline"
@@ -207,7 +267,7 @@ export default function ClientEdit() {
                               variant="outline"
                               size="sm"
                               onClick={(e) => {
-                                e.preventDefault(); // Impedir propagação
+                                e.preventDefault();
                                 handleEditGenerator(gerador);
                               }}
                             >
@@ -217,7 +277,7 @@ export default function ClientEdit() {
                               variant="destructive"
                               size="sm"
                               onClick={(e) => {
-                                e.preventDefault(); // Impedir propagação
+                                e.preventDefault();
                                 handleDeleteGenerator(gerador.id);
                               }}
                             >
@@ -233,8 +293,20 @@ export default function ClientEdit() {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button type="submit">Salvar</Button>
-                <Button type="button" variant="outline" onClick={() => navigate('/clients')}>Cancelar</Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Salvando...' : 'Salvar'}
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => navigate('/clients')}
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </Button>
               </div>
             </form>
           </CardContent>

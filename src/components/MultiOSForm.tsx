@@ -10,6 +10,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ServiceOrder, Client, Generator, GeneratorData, Verification } from '@/types';
 import { Trash2, Plus, Copy } from 'lucide-react';
+import { serviceOrderService } from '@/services/firebaseService';
+import { isFirebaseConfigured } from '@/lib/firebase';
 
 interface MultiOSFormProps {
   client: Client;
@@ -121,7 +123,7 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
   };
 
   // Função para salvar a OS
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!tecnico.trim()) {
       alert('Por favor, informe o técnico responsável');
       return;
@@ -161,11 +163,41 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
       // Se há callback, usar ele (modo assinatura)
       onSave(newOrder);
     } else {
-      // Salvar diretamente (modo antigo)
-      const updatedOrders = [...serviceOrders, newOrder];
-      setServiceOrders(updatedOrders);
-      alert('Ordem de Serviço salva com sucesso!');
-      navigate('/orders');
+      // Salvar diretamente (modo antigo) com integração Firebase
+      try {
+        // Salvar no localStorage primeiro
+        const updatedOrders = [...serviceOrders, newOrder];
+        setServiceOrders(updatedOrders);
+
+        // Tentar salvar no Firebase se estiver configurado
+        if (isFirebaseConfigured()) {
+          try {
+            const { id: _omit, ...orderData } = newOrder;
+            const firebaseId = await serviceOrderService.create(orderData);
+            
+            // Atualizar o ID local com referência do Firebase
+            const orderWithFirebaseId = { ...newOrder, id: `firebase_${firebaseId}` };
+            const finalOrders = updatedOrders.map(order => 
+              order.id === newOrder.id ? orderWithFirebaseId : order
+            );
+            setServiceOrders(finalOrders);
+            
+            alert('✅ Ordem de serviço salva com sucesso no sistema local e Firebase!');
+          } catch (firebaseError) {
+            console.error('Erro ao salvar no Firebase:', firebaseError);
+            alert('⚠️ Ordem de serviço salva localmente. Erro ao sincronizar com Firebase: ' + 
+                  (firebaseError instanceof Error ? firebaseError.message : 'Erro desconhecido'));
+          }
+        } else {
+          alert('ℹ️ Ordem de serviço salva localmente. Configure o Firebase para sincronização automática.');
+        }
+        
+        navigate('/orders');
+      } catch (error) {
+        console.error('Erro ao salvar ordem de serviço:', error);
+        alert('❌ Erro ao salvar ordem de serviço: ' + 
+              (error instanceof Error ? error.message : 'Erro desconhecido'));
+      }
     }
   };
 

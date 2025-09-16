@@ -153,7 +153,7 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
       id: Date.now().toString(),
       tecnico: tecnico.trim(),
       data,
-      cliente_id: client.id,
+      cliente_id: client.id.replace(/^firebase_/, ''), // Remove prefixo firebase_ do ID
       geradores: selectedGenerators,
       ...(observacoesGerais.trim() && { observacoes_gerais: observacoesGerais.trim() }),
       ...(representante.trim() && { representante: representante.trim() })

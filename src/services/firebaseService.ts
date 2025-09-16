@@ -2,6 +2,7 @@ import {
   collection, 
   addDoc, 
   getDocs, 
+  getDoc,
   doc, 
   updateDoc, 
   deleteDoc, 
@@ -239,15 +240,26 @@ export const clientService = {
 
   async getById(id: string) {
     checkFirebaseConfig();
-    const docRef = doc(db, 'clients', id);
-    const docSnap = await getDocs(query(collection(db, 'clients'), where('__name__', '==', id)));
-    if (docSnap.empty) return null;
-    
-    const clientDoc = docSnap.docs[0];
-    return {
-      id: clientDoc.id,
-      ...convertTimestamps(clientDoc.data())
-    } as Client;
+    try {
+      const docRef = doc(db, 'clients', id);
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        console.log('🔍 Cliente não encontrado no Firebase:', id);
+        return null;
+      }
+      
+      const clientData = {
+        id: docSnap.id,
+        ...convertTimestamps(docSnap.data())
+      } as Client;
+      
+      console.log('✅ Cliente encontrado no Firebase:', clientData.nome);
+      return clientData;
+    } catch (error) {
+      console.error('❌ Erro ao buscar cliente por ID:', error);
+      return null;
+    }
   },
 
   async update(id: string, data: Partial<Client>) {
@@ -351,30 +363,77 @@ export const serviceOrderService = {
   },
 
   async getAll() {
-    checkFirebaseConfig();
-    const querySnapshot = await getDocs(
-      query(collection(db, 'serviceOrders'), orderBy('createdAt', 'desc'))
-    );
-    return querySnapshot.docs.map(doc => {
-      const data = convertTimestamps(doc.data());
-      return {
-        id: doc.id,
-        ...normalizeServiceOrder(data)
-      } as ServiceOrder;
-    });
+    try {
+      console.log('🔥 serviceOrderService.getAll() - Iniciando...');
+      checkFirebaseConfig();
+      console.log('✅ Firebase configurado corretamente');
+      
+      const querySnapshot = await getDocs(
+        query(collection(db, 'serviceOrders'), orderBy('data', 'desc'))
+      );
+      console.log('📊 Query executada, documentos encontrados:', querySnapshot.docs.length);
+      
+      const orders = querySnapshot.docs.map((doc, index) => {
+        try {
+          const rawData = doc.data();
+          console.log(`📄 Processando documento ${index + 1}/${querySnapshot.docs.length}:`, doc.id);
+          console.log('📋 Dados brutos:', rawData);
+          
+          const convertedData = convertTimestamps(rawData);
+          console.log('🔄 Dados após conversão de timestamps:', convertedData);
+          
+          const normalizedData = normalizeServiceOrder(convertedData);
+          console.log('✅ Dados normalizados:', normalizedData);
+          
+          const finalOrder = {
+            id: doc.id,
+            ...normalizedData
+          } as ServiceOrder;
+          
+          console.log('🎯 Ordem final:', finalOrder);
+          return finalOrder;
+        } catch (docError) {
+          console.error(`❌ Erro ao processar documento ${doc.id}:`, docError);
+          console.error('❌ Dados do documento com erro:', doc.data());
+          throw docError;
+        }
+      });
+      
+      console.log('✅ serviceOrderService.getAll() - Concluído com sucesso');
+      console.log('📊 Total de ordens processadas:', orders.length);
+      return orders;
+      
+    } catch (error) {
+      console.error('❌ serviceOrderService.getAll() - Erro:', error);
+      console.error('❌ Detalhes do erro:', error.message);
+      console.error('❌ Stack trace:', error.stack);
+      throw error;
+    }
   },
 
   async getById(id: string) {
     checkFirebaseConfig();
-    const docSnap = await getDocs(query(collection(db, 'serviceOrders'), where('__name__', '==', id)));
-    if (docSnap.empty) return null;
-    
-    const orderDoc = docSnap.docs[0];
-    const data = convertTimestamps(orderDoc.data());
-    return {
-      id: orderDoc.id,
-      ...normalizeServiceOrder(data)
-    } as ServiceOrder;
+    try {
+      const docRef = doc(db, 'serviceOrders', id);
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        console.log('🔍 Ordem de serviço não encontrada no Firebase:', id);
+        return null;
+      }
+      
+      const data = convertTimestamps(docSnap.data());
+      const orderData = {
+        id: docSnap.id,
+        ...normalizeServiceOrder(data)
+      } as ServiceOrder;
+      
+      console.log('✅ Ordem de serviço encontrada no Firebase:', orderData.id);
+      return orderData;
+    } catch (error) {
+      console.error('❌ Erro ao buscar ordem de serviço por ID:', error);
+      return null;
+    }
   },
 
   async getByClientId(clientId: string) {
@@ -382,7 +441,7 @@ export const serviceOrderService = {
     const q = query(
       collection(db, 'serviceOrders'), 
       where('cliente_id', '==', clientId),
-      orderBy('createdAt', 'desc')
+      orderBy('data', 'desc')
     );
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => {
@@ -722,6 +781,42 @@ export const syncService = {
     } catch (error) {
       console.error('❌ Erro ao baixar dados:', error);
       return { success: false, message: 'Erro ao baixar dados do Firebase.' };
+    }
+  },
+
+  // Função para corrigir cliente_id nas ordens de serviço existentes
+  async fixClientIds() {
+    try {
+      console.log('🔧 Iniciando correção de cliente_id nas ordens de serviço...');
+      
+      // Carregar ordens locais
+      const localOrders = JSON.parse(localStorage.getItem('serviceOrders') || '[]') as ServiceOrder[];
+      let ordersFixed = 0;
+      
+      // Corrigir ordens que têm cliente_id com prefixo firebase_
+      const correctedOrders = localOrders.map(order => {
+        if (order.cliente_id && order.cliente_id.startsWith('firebase_')) {
+          ordersFixed++;
+          return {
+            ...order,
+            cliente_id: order.cliente_id.replace(/^firebase_/, '')
+          };
+        }
+        return order;
+      });
+      
+      // Salvar ordens corrigidas
+      if (ordersFixed > 0) {
+        localStorage.setItem('serviceOrders', JSON.stringify(correctedOrders));
+        console.log(`✅ ${ordersFixed} ordens de serviço corrigidas`);
+        return { success: true, message: `${ordersFixed} ordens de serviço foram corrigidas` };
+      } else {
+        console.log('ℹ️ Nenhuma ordem precisava de correção');
+        return { success: true, message: 'Nenhuma ordem precisava de correção' };
+      }
+    } catch (error) {
+      console.error('❌ Erro ao corrigir cliente_id:', error);
+      return { success: false, message: 'Erro ao corrigir cliente_id das ordens' };
     }
   },
 

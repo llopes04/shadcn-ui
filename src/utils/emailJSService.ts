@@ -101,7 +101,8 @@ export const sendServiceOrderEmailJS = async (
   order: ServiceOrder,
   client: Client,
   recipientEmail: string,
-  config: EmailJSConfig
+  config: EmailJSConfig,
+  secondaryEmail?: string
 ): Promise<boolean> => {
   try {
     console.log('Iniciando envio de email...', { recipientEmail, config });
@@ -171,10 +172,12 @@ ${companyName}`
     console.log('Enviando email com EmailJS...', { 
       serviceId: config.serviceId, 
       templateId: config.templateId,
-      publicKey: config.publicKey 
+      publicKey: config.publicKey,
+      primaryEmail: recipientEmail,
+      secondaryEmail: secondaryEmail
     });
 
-    // Enviar email
+    // Enviar email principal
     const response = await emailjs.send(
       config.serviceId,
       config.templateId,
@@ -182,7 +185,30 @@ ${companyName}`
       config.publicKey
     );
 
-    console.log('Email enviado com sucesso:', response);
+    console.log('Email principal enviado com sucesso:', response);
+    
+    // Se há email secundário, enviar também
+    if (secondaryEmail && secondaryEmail.trim() !== '') {
+      console.log('Enviando email secundário para:', secondaryEmail);
+      
+      const secondaryTemplateParams = {
+        ...templateParams,
+        to_email: secondaryEmail
+      };
+      
+      const secondaryResponse = await emailjs.send(
+        config.serviceId,
+        config.templateId,
+        secondaryTemplateParams,
+        config.publicKey
+      );
+      
+      console.log('Email secundário enviado com sucesso:', secondaryResponse);
+      
+      // Retorna true se ambos foram enviados com sucesso
+      return response.status === 200 && secondaryResponse.status === 200;
+    }
+    
     return response.status === 200;
 
   } catch (error) {

@@ -327,14 +327,25 @@ export default function ClientEdit() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
-                <Input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="email@exemplo.com"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email Principal</label>
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email Secundário (Opcional)</label>
+                  <Input
+                    type="email"
+                    value={formData.email2 || ''}
+                    onChange={(e) => handleInputChange('email2', e.target.value)}
+                    placeholder="email2@exemplo.com"
+                  />
+                </div>
               </div>
 
               <div className="pt-6">

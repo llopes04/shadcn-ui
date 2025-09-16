@@ -10,6 +10,7 @@ export default function SyncControls() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
+  const [isFixing, setIsFixing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleSyncToFirebase = async () => {
@@ -106,6 +107,30 @@ export default function SyncControls() {
       });
     } finally {
       setIsMerging(false);
+    }
+  };
+
+  const handleFixClientIds = async () => {
+    setIsFixing(true);
+    setMessage(null);
+
+    try {
+      console.log('🔧 Iniciando correção de cliente_id...');
+      const result = await syncService.fixClientIds();
+      console.log('📊 Resultado da correção:', result);
+      
+      setMessage({ 
+        type: result.success ? 'success' : 'error', 
+        text: result.message 
+      });
+    } catch (error) {
+      console.error('❌ Erro detalhado:', error);
+      setMessage({ 
+        type: 'error', 
+        text: `Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}` 
+      });
+    } finally {
+      setIsFixing(false);
     }
   };
 

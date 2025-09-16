@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { ServiceOrder, Client, RTI, Generator } from '@/types';
 import { generateServiceOrderPDF, downloadPDF } from '@/utils/pdfGenerator';
 import { sendServiceOrderEmailJS, defaultEmailJSConfig, EmailJSConfig } from '@/utils/emailJSService';
 import RTIForm from '@/components/RTIForm';
-import { serviceOrderService } from '@/services/firebaseService';
+import { serviceOrderService, clientService } from '@/services/firebaseService';
+import { Search, Calendar } from 'lucide-react';
 
 interface LegacyServiceOrder extends Omit<ServiceOrder, 'geradores'> {
   gerador_id?: string;
@@ -18,7 +20,7 @@ interface LegacyServiceOrder extends Omit<ServiceOrder, 'geradores'> {
 export default function OrdersList() {
   const navigate = useNavigate();
   const [serviceOrders, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', []);
-  const [clients] = useLocalStorage<Client[]>('clients', []);
+  const [clients, setClients] = useLocalStorage<Client[]>('clients', []);
   const [rtis, setRTIs] = useLocalStorage<RTI[]>('rtis', []);
   const [currentUser] = useLocalStorage('currentUser', null);
   const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
@@ -26,28 +28,79 @@ export default function OrdersList() {
   const [showRTIForm, setShowRTIForm] = useState(false);
   const [selectedRTI, setSelectedRTI] = useState<RTI | null>(null);
   const [showRTIDetails, setShowRTIDetails] = useState(false);
+  const [searchId, setSearchId] = useState('');
+  const [searchDate, setSearchDate] = useState('');
+  const [searchClientName, setSearchClientName] = useState('');
 
   // Load Firebase data with proper dependency control
   useEffect(() => {
     let isMounted = true;
     
     const loadFirebaseData = async () => {
+      console.log('🚀 INICIANDO DIAGNÓSTICO COMPLETO...');
       try {
-        console.log('🔥 Carregando dados do Firebase...');
-        const firebaseOrders = await serviceOrderService.getAll();
-        console.log('📊 Dados do Firebase carregados:', firebaseOrders.length, 'ordens');
+        console.log('🔥 Iniciando carregamento do Firebase...');
+        console.log('📊 Estado atual das ordens:', serviceOrders.length);
+        console.log('👥 Estado atual dos clientes:', clients.length);
         
-        if (!isMounted) return; // Prevent state update if component unmounted
+        // Carregar ordens e clientes em paralelo
+        const [firebaseOrders, firebaseClients] = await Promise.all([
+          serviceOrderService.getAll(),
+          clientService.getAll()
+        ]);
         
-        // Only merge if we don't have local data or if explicitly requested
-        if (serviceOrders.length === 0) {
-          console.log('🔄 Carregando dados iniciais do Firebase');
-          setServiceOrders(firebaseOrders);
-        } else {
-          console.log('📝 Dados locais existem, mantendo estado local');
+        console.log('📊 Dados do Firebase carregados:');
+        console.log('📋 Ordens:', firebaseOrders.length);
+        console.log('👥 Clientes:', firebaseClients.length);
+        console.log('📋 Detalhes das ordens:', firebaseOrders.map(o => ({ id: o.id, cliente_id: o.cliente_id, data: o.data })));
+        console.log('👥 Detalhes dos clientes:', firebaseClients.map(c => ({ id: c.id, nome: c.nome })));
+        
+        // Verificar se há ordens com clientes não encontrados
+        const ordersWithMissingClients = firebaseOrders.filter(order => {
+          const clientExists = firebaseClients.some(client => client.id === order.cliente_id);
+          return !clientExists;
+        });
+        
+        if (ordersWithMissingClients.length > 0) {
+           console.warn('⚠️ Ordens com clientes não encontrados:', ordersWithMissingClients.map(o => ({
+             orderId: o.id,
+             clienteId: o.cliente_id,
+             data: o.data
+           })));
+           
+           console.warn('🔍 ANÁLISE DETALHADA DOS CLIENTES PROBLEMÁTICOS:');
+           ordersWithMissingClients.forEach((order, index) => {
+             console.warn(`❌ Problema ${index + 1}:`, {
+               ordem_id: order.id,
+               cliente_id_procurado: order.cliente_id,
+               tipo_cliente_id: typeof order.cliente_id,
+               data_ordem: order.data,
+               clientes_disponiveis: firebaseClients.map(c => c.id),
+               total_clientes: firebaseClients.length
+             });
+           });
+         }
+        
+        if (!isMounted) {
+          console.log('⚠️ Componente desmontado, cancelando atualização');
+          return;
         }
+        
+        // Sempre carregar dados do Firebase para garantir sincronização
+        console.log('🔄 Atualizando estado com dados do Firebase');
+        setServiceOrders(firebaseOrders);
+        setClients(firebaseClients);
+        console.log('✅ Estado atualizado com sucesso');
+        
       } catch (error) {
         console.error('❌ Erro ao carregar dados do Firebase:', error);
+        console.error('❌ Detalhes do erro:', error.message);
+        console.error('❌ Stack trace:', error.stack);
+        
+        // Em caso de erro, manter dados locais se existirem
+        if (serviceOrders.length > 0) {
+          console.log('📝 Mantendo dados locais devido ao erro');
+        }
       }
     };
 
@@ -60,15 +113,69 @@ export default function OrdersList() {
     };
   }, []); // Empty dependency array - only run once on mount
 
-  const getClientName = (clientId: string) => {
-    console.log('🔥 getClientName chamado para:', clientId);
-    const client = clients.find(c => c.id === clientId);
-    const result = client ? client.nome : 'Cliente não encontrado';
-    console.log('🔥 getClientName resultado:', result);
-    return result;
+  const getClientName = (clientId: string): string => {
+    console.log('🔍 Buscando cliente ID:', clientId, 'Tipo:', typeof clientId);
+    console.log('🔍 Clientes disponíveis para busca:', clients.map(c => ({ id: c.id, tipo: typeof c.id, nome: c.nome })));
+    
+    const client = getClient(clientId);
+    console.log('🔍 Cliente encontrado:', client ? { id: client.id, nome: client.nome } : 'NENHUM');
+    
+    if (!client) {
+      console.warn('⚠️ Cliente não encontrado para ID:', clientId);
+      console.warn('⚠️ IDs disponíveis:', clients.map(c => c.id));
+      
+      // Tentar buscar cliente no Firebase se não encontrado localmente
+      loadMissingClient(clientId);
+    }
+    
+    return client ? client.nome : `Cliente não encontrado (${clientId})`;
   };
+  
+  const loadMissingClient = async (clientId: string) => {
+    try {
+      console.log('🔄 Tentando carregar cliente do Firebase:', clientId);
+      const firebaseClient = await clientService.getById(clientId);
+      
+      if (firebaseClient) {
+        console.log('✅ Cliente encontrado no Firebase:', firebaseClient.nome);
+        // Adicionar cliente aos dados locais
+        const updatedClients = [...clients, firebaseClient];
+        setClients(updatedClients);
+      } else {
+        console.warn('❌ Cliente não existe no Firebase:', clientId);
+      }
+    } catch (error) {
+      console.error('❌ Erro ao buscar cliente no Firebase:', error);
+    }
+  };
+       
 
-  const getClient = (clientId: string) => {
+   
+   const fixMissingClients = async (missingClientIds) => {
+     console.log('🔧 Recuperando clientes ausentes:', missingClientIds);
+     
+     for (const clientId of missingClientIds) {
+       try {
+         console.log(`🔍 Buscando cliente: ${clientId}`);
+         const firebaseClient = await clientService.getById(clientId);
+         
+         if (firebaseClient) {
+           console.log(`✅ Cliente encontrado: ${firebaseClient.nome}`);
+           const updatedClients = [...clients, firebaseClient];
+           setClients(updatedClients);
+           console.log(`✅ Cliente ${firebaseClient.nome} adicionado aos dados locais`);
+         } else {
+           console.warn(`❌ Cliente ${clientId} não existe no Firebase`);
+         }
+       } catch (error) {
+         console.error(`❌ Erro ao buscar cliente ${clientId}:`, error);
+       }
+     }
+     
+     console.log('🔄 Processo de recuperação concluído');
+   };
+ 
+   const getClient = (clientId: string) => {
     return clients.find(c => c.id === clientId);
   };
 
@@ -107,6 +214,38 @@ export default function OrdersList() {
 
   const getRTIForOrder = (orderId: string) => {
     return rtis.find(rti => rti.service_order_id === orderId) || null;
+  };
+
+  // Função para filtrar ordens baseada nos campos de pesquisa
+  const getFilteredOrders = () => {
+    let filtered = serviceOrders;
+
+    // Filtrar por ID (formato OS #LbXx)
+    if (searchId.trim()) {
+      const searchTerm = searchId.toLowerCase().replace(/^os\s*#?/, ''); // Remove "OS #" se presente
+      filtered = filtered.filter(order => {
+        const orderIdShort = order.id.slice(-4).toLowerCase(); // Últimos 4 caracteres do ID
+        return orderIdShort.includes(searchTerm) || order.id.toLowerCase().includes(searchTerm);
+      });
+    }
+
+    // Filtrar por data
+    if (searchDate.trim()) {
+      filtered = filtered.filter(order => {
+        return order.data && order.data.includes(searchDate);
+      });
+    }
+
+    // Filtrar por nome do cliente
+    if (searchClientName.trim()) {
+      const searchTerm = searchClientName.toLowerCase();
+      filtered = filtered.filter(order => {
+        const client = getClient(order.cliente_id);
+        return client && client.nome.toLowerCase().includes(searchTerm);
+      });
+    }
+
+    return filtered;
   };
 
   const handleViewDetails = (order: ServiceOrder) => {
@@ -163,17 +302,25 @@ export default function OrdersList() {
     setIsSendingEmail(order.id);
     try {
       console.log('Enviando email para:', client.email);
+      if (client.email2) {
+        console.log('Email secundário:', client.email2);
+      }
       console.log('Configuração EmailJS:', config);
       
       const success = await sendServiceOrderEmailJS(
         order, 
         client, 
         client.email,
-        config
+        config,
+        client.email2
       );
       
       if (success) {
-        alert(`Email enviado com sucesso para ${client.email}!`);
+        let message = `Email enviado com sucesso para ${client.email}!`;
+        if (client.email2) {
+          message += ` E também para ${client.email2}!`;
+        }
+        alert(message);
       } else {
         alert('Erro ao enviar email. Verifique a configuração.');
       }
@@ -339,20 +486,29 @@ export default function OrdersList() {
             <Button 
               onClick={async () => {
                 try {
-                  console.log('🔄 Recarregando dados do Firebase...');
+                  console.log('🔄 Iniciando recarregamento manual do Firebase...');
+                  console.log('📊 Estado atual antes do reload:', serviceOrders.length, 'ordens');
+                  
                   const firebaseOrders = await serviceOrderService.getAll();
-                  console.log('📊 Dados do Firebase:', firebaseOrders.length, 'ordens');
+                  console.log('📊 Dados do Firebase recarregados:', firebaseOrders.length, 'ordens');
+                  console.log('📋 Detalhes das ordens recarregadas:', firebaseOrders.map(o => ({ id: o.id, cliente_id: o.cliente_id, data: o.data })));
+                  
                   setServiceOrders(firebaseOrders);
-                  alert(`Dados recarregados: ${firebaseOrders.length} ordens`);
+                  console.log('✅ Estado atualizado após recarregamento manual');
+                  
+                  alert(`Dados recarregados com sucesso: ${firebaseOrders.length} ordens encontradas`);
                 } catch (error) {
-                  console.error('❌ Erro ao recarregar:', error);
-                  alert('Erro ao recarregar dados do Firebase');
+                  console.error('❌ Erro ao recarregar dados do Firebase:', error);
+                  console.error('❌ Detalhes do erro:', error.message);
+                  console.error('❌ Stack trace:', error.stack);
+                  alert(`Erro ao recarregar dados do Firebase: ${error.message}`);
                 }
               }}
               className="bg-green-500 hover:bg-green-600 text-white"
             >
               🔄 Recarregar Firebase
             </Button>
+
           </div>
         </div>
 
@@ -360,14 +516,80 @@ export default function OrdersList() {
           <CardHeader>
             <CardTitle>Lista de Ordens</CardTitle>
             <CardDescription>
-              {serviceOrders.length} ordem(ns) de serviço
+              {getFilteredOrders().length} de {serviceOrders.length} ordem(ns) de serviço
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Campos de Pesquisa */}
+            <div className="mb-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    type="text"
+                    placeholder="Pesquisar por ID (ex: LbXx ou OS #LbXx)"
+                    value={searchId}
+                    onChange={(e) => setSearchId(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    type="text"
+                    placeholder="Pesquisar por data (ex: 2024-01-15)"
+                    value={searchDate}
+                    onChange={(e) => setSearchDate(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    type="text"
+                    placeholder="Pesquisar por nome do cliente"
+                    value={searchClientName}
+                    onChange={(e) => setSearchClientName(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              {(searchId || searchDate || searchClientName) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Filtros ativos:</span>
+                  {searchId && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                      ID: {searchId}
+                    </span>
+                  )}
+                  {searchDate && (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
+                      Data: {searchDate}
+                    </span>
+                  )}
+                  {searchClientName && (
+                    <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-full text-xs">
+                      Cliente: {searchClientName}
+                    </span>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchId('');
+                      setSearchDate('');
+                      setSearchClientName('');
+                    }}
+                    className="text-xs"
+                  >
+                    Limpar filtros
+                  </Button>
+                </div>
+              )}
+            </div>
             {(() => {
-              console.log('🔥 Total de ordens no estado:', serviceOrders.length);
-              console.log('🔥 Lista de ordens:', serviceOrders);
-              return serviceOrders.length === 0;
+              const filteredOrders = getFilteredOrders();
+              return filteredOrders.length === 0 && serviceOrders.length === 0;
             })() ? (
               <div className="text-center py-8 text-gray-500">
                 <p>Nenhuma ordem de serviço cadastrada</p>
@@ -378,29 +600,57 @@ export default function OrdersList() {
                   Criar Primeira OS
                 </Button>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {serviceOrders.map((order) => {
-                  console.log('🔥 Renderizando ordem:', order.id);
-                  const hasRTI = getRTIForOrder(order.id) !== null;
-                  const generatorsDescription = getGeneratorsDescription(order);
-                  const isCurrentlySending = isSendingEmail === order.id;
-                  
-                  return (
-                    <div key={order.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-lg">OS #{order.id.slice(-4)}</h3>
-                          <p className="text-gray-600">Cliente: {getClientName(order.cliente_id)}</p>
-                          <p className="text-gray-600">Geradores: {generatorsDescription}</p>
-                          <p className="text-gray-600">Data: {order.data}</p>
-                          <p className="text-gray-600">Técnico: {order.tecnico}</p>
-                          {hasRTI && (
-                            <span className="inline-block mt-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                              RTI disponível
-                            </span>
-                          )}
-                        </div>
+            ) : (() => {
+              const filteredOrders = getFilteredOrders();
+              
+              if (filteredOrders.length === 0) {
+                return (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>Nenhuma ordem encontrada com os filtros aplicados</p>
+                    <Button 
+                      variant="outline"
+                      onClick={() => {
+                        setSearchId('');
+                        setSearchDate('');
+                      }}
+                      className="mt-4"
+                    >
+                      Limpar filtros
+                    </Button>
+                  </div>
+                );
+              }
+              
+              return (
+                <div className="space-y-3">
+                  {filteredOrders.map((order, index) => {
+                   if (!order || !order.id) {
+                     return (
+                       <div key={`invalid-${index}`} className="border rounded-lg p-4 bg-red-50 border-red-200">
+                         <p className="text-red-600">❌ Ordem inválida (sem ID)</p>
+                       </div>
+                     );
+                   }
+                   
+                   const hasRTI = getRTIForOrder(order.id) !== null;
+                   const generatorsDescription = getGeneratorsDescription(order);
+                   const isCurrentlySending = isSendingEmail === order.id;
+                   
+                   return (
+                       <div key={order.id} className="border rounded-lg p-4 hover:bg-gray-50">
+                         <div className="flex justify-between items-start">
+                           <div className="flex-1">
+                             <h3 className="font-semibold text-lg">OS #{order.id.slice(-4)}</h3>
+                             <p className="text-gray-600">Cliente: {getClientName(order.cliente_id)}</p>
+                             <p className="text-gray-600">Geradores: {generatorsDescription}</p>
+                             <p className="text-gray-600">Data: {order.data}</p>
+                             <p className="text-gray-600">Técnico: {order.tecnico}</p>
+                             {hasRTI && (
+                               <span className="inline-block mt-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                                 RTI disponível
+                               </span>
+                             )}
+                           </div>
                         <div className="flex flex-col gap-2">
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             order.assinatura 
@@ -464,9 +714,10 @@ export default function OrdersList() {
                       </div>
                     </div>
                   );
-                })}
+              })}
               </div>
-            )}
+            );
+          })()}
           </CardContent>
         </Card>
 

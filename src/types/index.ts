@@ -4,6 +4,7 @@ export interface Client {
   endereco: string;
   telefone: string;
   email: string;
+  email2?: string;
   cidade: string;
   estado: string;
   geradores: Generator[];

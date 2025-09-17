@@ -16,6 +16,7 @@ import ConfigFirebase from '@/pages/ConfigFirebase';
 import NotFound from '@/pages/NotFound';
 import { InstallPrompt } from '@/components/InstallPrompt';
 import { PWAStatus } from '@/components/PWAStatus';
+import { OfflineSync } from '@/components/OfflineSync';
 
 function App() {
   const [showInstallPrompt, setShowInstallPrompt] = useState(true);
@@ -44,6 +45,7 @@ function App() {
           <Route path="/config-email" element={<ConfigEmail />} />
           <Route path="/config/firebase" element={<ConfigFirebase />} />
           <Route path="/config-firebase" element={<ConfigFirebase />} />
+          <Route path="/offline-sync" element={<OfflineSync />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         

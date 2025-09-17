@@ -8,12 +8,14 @@ import { Client, Generator } from '@/types';
 import GeneratorForm from '@/components/GeneratorForm';
 import { clientService } from '@/services/firebaseService';
 import { useToast } from '@/hooks/use-toast';
+import { useOfflineFirebase } from '@/hooks/useOfflineFirebase';
 
 export default function ClientEdit() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [clients, setClients] = useLocalStorage<Client[]>('clients', []);
   const { toast } = useToast();
+  const { updateWithOfflineSupport, isOnline } = useOfflineFirebase();
   const [formData, setFormData] = useState({
     nome: '',
     endereco: '',
@@ -63,14 +65,8 @@ export default function ClientEdit() {
         return;
       }
 
-      // Gerar novo ID baseado no nome se o nome foi alterado
-      const clienteAtual = clients.find(c => c.id === id);
-      let clientId = id!;
-      
-      if (clienteAtual && clienteAtual.nome.toLowerCase().trim() !== formData.nome.toLowerCase().trim()) {
-        // Nome foi alterado, gerar novo ID
-        clientId = formData.nome.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
-      }
+      // Manter o ID original do cliente (não alterar ID quando nome muda)
+      const clientId = id!;
 
       const updatedClient: Client = {
         id: clientId,
@@ -80,22 +76,13 @@ export default function ClientEdit() {
 
       console.log('Atualizando cliente:', updatedClient);
 
-      // Se o ID mudou, precisamos atualizar as referências nas ordens de serviço
-      if (clientId !== id) {
-        const serviceOrders = JSON.parse(localStorage.getItem('serviceOrders') || '[]');
-        const updatedOrders = serviceOrders.map((order: any) => 
-          order.cliente_id === id ? { ...order, cliente_id: clientId } : order
-        );
-        localStorage.setItem('serviceOrders', JSON.stringify(updatedOrders));
-      }
+      // ID do cliente não muda mais, então não precisamos atualizar referências
 
       // Marcar timestamp da edição para evitar sobrescrita
       localStorage.setItem('lastClientEdit', Date.now().toString());
       
       // Atualizar no localStorage primeiro
-      const updatedClients = clientId !== id 
-        ? clients.map(c => c.id === id ? updatedClient : c).filter(c => c.id !== id).concat([updatedClient])
-        : clients.map(c => c.id === id ? updatedClient : c);
+      const updatedClients = clients.map(c => c.id === id ? updatedClient : c);
       
       // Aguardar a atualização do localStorage
       setClients(updatedClients);
@@ -105,26 +92,30 @@ export default function ClientEdit() {
 
       // Se é um cliente do Firebase, atualizar no Firebase também
       if (id && id.startsWith('firebase_')) {
-        try {
-          const remoteId = id.replace(/^firebase_/, '');
-          const { id: _localId, ...clientData } = updatedClient;
-          
-          await clientService.update(remoteId, clientData);
-          
+        const remoteId = id.replace(/^firebase_/, '');
+        const { id: _localId, ...clientData } = updatedClient;
+        
+        const success = await updateWithOfflineSupport(
+          () => clientService.update(remoteId, clientData),
+          'clients',
+          clientData,
+          { showToast: false }
+        );
+        
+        if (success) {
           toast({
             title: "Sucesso",
             description: "Cliente atualizado com sucesso!",
             variant: "default",
           });
-        } catch (firebaseError) {
-          console.error('Erro ao atualizar no Firebase:', firebaseError);
-          const errorMessage = (firebaseError as Error).message;
+        } else {
           toast({
-            title: "Erro de Sincronização",
-            description: `Cliente atualizado localmente, mas houve erro ao sincronizar com Firebase: ${errorMessage}`,
-            variant: "destructive",
+            title: isOnline ? "Erro de Sincronização" : "Atualizado Offline",
+            description: isOnline ? 
+              "Cliente atualizado localmente, mas houve erro ao sincronizar com Firebase." :
+              "Cliente atualizado offline. Será sincronizado quando voltar online.",
+            variant: isOnline ? "destructive" : "default",
           });
-          setSyncErrors(prev => [...prev, `Atualização do cliente: ${errorMessage}`]);
         }
       } else {
         toast({

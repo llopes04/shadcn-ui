@@ -81,8 +81,8 @@ export default function RTIForm({
         </CardTitle>
         <CardDescription>
           {existingRTI ? 
-            `Editando RTI para OS #${serviceOrder.id.slice(-6)}` : 
-            `Criando novo RTI para OS #${serviceOrder.id.slice(-6)}`}
+          `Editando RTI para OS #${serviceOrder.id.slice(-6)}` :
+          `Criando novo RTI para OS #${serviceOrder.id.slice(-6)}`}
           <br />
           <span className="text-xs text-blue-600">
             * O RTI é um documento interno e não aparece no PDF da Ordem de Serviço

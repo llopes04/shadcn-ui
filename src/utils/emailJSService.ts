@@ -7,6 +7,8 @@ export interface EmailJSConfig {
   serviceId: string;
   templateId: string;
   publicKey: string;
+  companyName?: string;
+  signature?: string;
 }
 
 export const defaultEmailJSConfig: EmailJSConfig = {
@@ -105,15 +107,12 @@ export const sendServiceOrderEmailJS = async (
   secondaryEmail?: string
 ): Promise<boolean> => {
   try {
-    console.log('Iniciando envio de email...', { recipientEmail, config });
-
     // Gerar PDF
     const clientGenerators = client.geradores || [];
     const pdf = await generateServiceOrderPDF(order, client, clientGenerators);
     
     // Converter PDF para base64
     const pdfBase64 = await pdfToBase64(pdf);
-    console.log('PDF gerado e convertido para base64');
 
     // Obter informações da empresa
     const companyName = getCompanyName();
@@ -169,14 +168,6 @@ Atenciosamente,
 ${companyName}`
     };
 
-    console.log('Enviando email com EmailJS...', { 
-      serviceId: config.serviceId, 
-      templateId: config.templateId,
-      publicKey: config.publicKey,
-      primaryEmail: recipientEmail,
-      secondaryEmail: secondaryEmail
-    });
-
     // Enviar email principal
     const response = await emailjs.send(
       config.serviceId,
@@ -184,13 +175,9 @@ ${companyName}`
       templateParams,
       config.publicKey
     );
-
-    console.log('Email principal enviado com sucesso:', response);
     
     // Se há email secundário, enviar também
     if (secondaryEmail && secondaryEmail.trim() !== '') {
-      console.log('Enviando email secundário para:', secondaryEmail);
-      
       const secondaryTemplateParams = {
         ...templateParams,
         to_email: secondaryEmail
@@ -202,8 +189,6 @@ ${companyName}`
         secondaryTemplateParams,
         config.publicKey
       );
-      
-      console.log('Email secundário enviado com sucesso:', secondaryResponse);
       
       // Retorna true se ambos foram enviados com sucesso
       return response.status === 200 && secondaryResponse.status === 200;

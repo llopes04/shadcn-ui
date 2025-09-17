@@ -15,6 +15,35 @@ import {
 import { db, isFirebaseConfigured } from '@/lib/firebase';
 import { ServiceOrder, Client, User } from '@/types';
 
+// Cache simples para dados frequentemente acessados
+const cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+const getCachedData = (key: string) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < cached.ttl) {
+    return cached.data;
+  }
+  cache.delete(key);
+  return null;
+};
+
+const setCachedData = (key: string, data: any, ttl = CACHE_TTL) => {
+  cache.set(key, { data, timestamp: Date.now(), ttl });
+};
+
+const clearCache = (pattern?: string) => {
+  if (pattern) {
+    for (const key of cache.keys()) {
+      if (key.includes(pattern)) {
+        cache.delete(key);
+      }
+    }
+  } else {
+    cache.clear();
+  }
+};
+
 // Verificar se Firebase está configurado antes de usar
 const checkFirebaseConfig = () => {
   if (!isFirebaseConfigured()) {
@@ -224,18 +253,30 @@ export const clientService = {
       ...client,
       createdAt: Timestamp.now()
     });
+    
+    // Limpar cache relacionado
+    clearCache('clients');
+    
     return docRef.id;
   },
 
   async getAll() {
     checkFirebaseConfig();
+    
+    const cacheKey = 'clients_all';
+    const cached = getCachedData(cacheKey);
+    if (cached) return cached;
+    
     const querySnapshot = await getDocs(
       query(collection(db, 'clients'), orderBy('createdAt', 'desc'))
     );
-    return querySnapshot.docs.map(doc => ({
+    const clients = querySnapshot.docs.map(doc => ({
       id: doc.id,
       ...convertTimestamps(doc.data())
     })) as Client[];
+    
+    setCachedData(cacheKey, clients);
+    return clients;
   },
 
   async getById(id: string) {
@@ -359,45 +400,42 @@ export const serviceOrderService = {
       ...order,
       createdAt: Timestamp.now()
     });
+    
+    // Limpar cache relacionado
+    clearCache('serviceOrders');
+    
     return docRef.id;
   },
 
   async getAll() {
     try {
-      console.log('🔥 serviceOrderService.getAll() - Iniciando...');
       checkFirebaseConfig();
-      console.log('✅ Firebase configurado corretamente');
+      
+      const cacheKey = 'serviceOrders_all';
+      const cached = getCachedData(cacheKey);
+      if (cached) return cached;
       
       const querySnapshot = await getDocs(
         query(collection(db, 'serviceOrders'), orderBy('data', 'desc'))
       );
-      console.log('📊 Query executada, documentos encontrados:', querySnapshot.docs.length);
       
-      const orders = querySnapshot.docs.map((doc, index) => {
+      const orders = querySnapshot.docs.map((doc) => {
         try {
           const rawData = doc.data();
-          console.log(`📄 Processando documento ${index + 1}/${querySnapshot.docs.length}:`, doc.id);
-          console.log('📋 Dados brutos:', rawData);
-          
           const convertedData = convertTimestamps(rawData);
-          console.log('🔄 Dados após conversão de timestamps:', convertedData);
-          
           const normalizedData = normalizeServiceOrder(convertedData);
-          console.log('✅ Dados normalizados:', normalizedData);
           
-          const finalOrder = {
+          return {
             id: doc.id,
             ...normalizedData
           } as ServiceOrder;
-          
-          console.log('🎯 Ordem final:', finalOrder);
-          return finalOrder;
         } catch (docError) {
-          console.error(`❌ Erro ao processar documento ${doc.id}:`, docError);
-          console.error('❌ Dados do documento com erro:', doc.data());
+          console.error(`Erro ao processar documento ${doc.id}:`, docError);
           throw docError;
         }
       });
+      
+      setCachedData(cacheKey, orders);
       
       console.log('✅ serviceOrderService.getAll() - Concluído com sucesso');
       console.log('📊 Total de ordens processadas:', orders.length);
@@ -610,8 +648,6 @@ export const syncService = {
     checkFirebaseConfig();
     
     try {
-      console.log('🚀 Iniciando sincronização para Firebase...');
-
       // Carregar dados remotos para evitar duplicatas
       const [firebaseClients, firebaseOrders, firebaseUsers] = await Promise.all([
         clientService.getAll(),
@@ -619,6 +655,7 @@ export const syncService = {
         userService.getAll().catch(() => []) // segurança caso coleção não exista
       ]);
 
+      // Criar mapas para busca eficiente
       const clientByNome = new Map<string, { id: string }>();
       firebaseClients.forEach(c => {
         const nomeNormalizado = (c.nome || '').toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
@@ -637,66 +674,49 @@ export const syncService = {
       
       // Sincronizar clientes
       const localClients = JSON.parse(localStorage.getItem('clients') || '[]') as Client[];
-      console.log('📊 Clientes locais encontrados:', localClients.length);
       let clientsUploaded = 0;
       let clientsLinked = 0;
       
       for (let i = 0; i < localClients.length; i++) {
         const client = localClients[i];
-        if (!client) continue;
-        const nomeNormalizado = (client.nome || '').toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        if (!client || (client.id && client.id.includes('firebase_'))) continue;
         
-        if (client.id && client.id.includes('firebase_')) {
-          // Já sincronizado
-          continue;
-        }
-
-        // Se já existe no Firebase por nome normalizado, apenas vincular e marcar localmente
+        const nomeNormalizado = (client.nome || '').toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
         const remoteClient = clientByNome.get(nomeNormalizado);
+        
         if (remoteClient) {
           localClients[i] = { ...client, id: `firebase_${remoteClient.id}` } as Client;
           clientsLinked++;
-          continue;
+        } else {
+          const { id: _drop, ...clientData } = client as Client;
+          const newId = await clientService.create(clientData as Omit<Client, 'id'>);
+          localClients[i] = { ...client, id: `firebase_${newId}` } as Client;
+          clientsUploaded++;
         }
-
-        // Não existe no Firebase: criar e marcar localmente
-        const { id: _drop, ...clientData } = client as Client;
-        console.log('📤 Enviando cliente:', client.nome);
-        const newId = await clientService.create(clientData as Omit<Client, 'id'>);
-        localClients[i] = { ...client, id: `firebase_${newId}` } as Client;
-        clientsUploaded++;
       }
-      // Persistir alterações locais de clientes
       localStorage.setItem('clients', JSON.stringify(localClients));
 
       // Sincronizar ordens de serviço
       const localOrders = JSON.parse(localStorage.getItem('serviceOrders') || '[]') as ServiceOrder[];
-      console.log('📊 Ordens locais encontradas:', localOrders.length);
       let ordersUploaded = 0;
       let ordersLinked = 0;
       
       for (let i = 0; i < localOrders.length; i++) {
         const order = localOrders[i];
-        if (!order) continue;
-        if (order.id && order.id.includes('firebase_')) {
-          // Já sincronizada
-          continue;
-        }
+        if (!order || (order.id && order.id.includes('firebase_'))) continue;
 
         const key = orderKey(order);
         const remoteOrder = orderByKey.get(key);
+        
         if (remoteOrder) {
-          // Já existe no Firebase, apenas vincular
           localOrders[i] = { ...order, id: `firebase_${remoteOrder.id}` } as ServiceOrder;
           ordersLinked++;
-          continue;
+        } else {
+          const { id: _omit, ...orderData } = order as ServiceOrder;
+          const newOrderId = await serviceOrderService.create(orderData as Omit<ServiceOrder, 'id'>);
+          localOrders[i] = { ...order, id: `firebase_${newOrderId}` } as ServiceOrder;
+          ordersUploaded++;
         }
-
-        const { id: _omit, ...orderData } = order as ServiceOrder;
-        console.log('📤 Enviando ordem:', order.id);
-        const newOrderId = await serviceOrderService.create(orderData as Omit<ServiceOrder, 'id'>);
-        localOrders[i] = { ...order, id: `firebase_${newOrderId}` } as ServiceOrder;
-        ordersUploaded++;
       }
       // Persistir alterações locais de ordens
       localStorage.setItem('serviceOrders', JSON.stringify(localOrders));

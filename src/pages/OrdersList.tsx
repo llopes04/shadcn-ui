@@ -224,8 +224,7 @@ export default function OrdersList() {
     if (searchId.trim()) {
       const searchTerm = searchId.toLowerCase().replace(/^os\s*#?/, ''); // Remove "OS #" se presente
       filtered = filtered.filter(order => {
-        const orderIdShort = order.id.slice(-4).toLowerCase(); // Últimos 4 caracteres do ID
-        return orderIdShort.includes(searchTerm) || order.id.toLowerCase().includes(searchTerm);
+        return order.id.toLowerCase().includes(searchTerm);
       });
     }
 
@@ -266,7 +265,7 @@ export default function OrdersList() {
     try {
       const generators = getClientGenerators(order.cliente_id);
       const pdf = await generateServiceOrderPDF(order, client, generators);
-      downloadPDF(pdf, `ordem_servico_${order.id.slice(-6)}.pdf`);
+      downloadPDF(pdf, `ordem_servico_${order.id.slice(-4)}.pdf`);
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       alert('Erro ao gerar PDF');

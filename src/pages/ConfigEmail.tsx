@@ -13,9 +13,9 @@ import { EmailJSConfig } from '@/utils/emailJSService';
 const ConfigEmail = () => {
   const navigate = useNavigate();
   const [emailConfig, setEmailConfig] = useState<EmailJSConfig>({
-    serviceId: '',
-    templateId: '',
-    publicKey: '',
+    serviceId: 'service_qwtsafe',
+    templateId: 'template_ll647ew',
+    publicKey: 'DzFTH1PSxzQME9aZ3',
     companyName: '',
     signature: ''
   });
@@ -27,6 +27,10 @@ const ConfigEmail = () => {
     const savedConfig = localStorage.getItem('emailjs_config');
     if (savedConfig) {
       setEmailConfig(JSON.parse(savedConfig));
+      setIsSaved(true);
+    } else {
+      // Salvar configurações padrão se não existirem
+      localStorage.setItem('emailjs_config', JSON.stringify(emailConfig));
       setIsSaved(true);
     }
   }, []);

@@ -7,6 +7,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Client, Generator } from '@/types';
 import GeneratorForm from '@/components/GeneratorForm';
 import { clientService } from '@/services/firebaseService';
+import { useOfflineFirebase } from '@/hooks/useOfflineFirebase';
 
 export default function ClientForm() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function ClientForm() {
   const [showGeneratorForm, setShowGeneratorForm] = useState(false);
   const [editingGenerator, setEditingGenerator] = useState<Generator | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { createWithOfflineSupport, isOnline } = useOfflineFirebase();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,8 +45,8 @@ export default function ClientForm() {
         return;
       }
 
-      // Gerar ID baseado no nome do cliente (normalizado)
-      const clientId = formData.nome.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      // Gerar ID único para o cliente
+      const clientId = Date.now().toString();
       
       const newClient: Client = {
         id: clientId,
@@ -58,24 +60,28 @@ export default function ClientForm() {
       const updatedClients = [...clients, newClient];
       setClients(updatedClients);
 
-      // Tentar salvar no Firebase também
-      try {
-        console.log('Tentando salvar no Firebase...');
-        const { id: _localId, ...clientData } = newClient;
-        const firebaseId = await clientService.create(clientData);
-        console.log('Cliente salvo no Firebase com ID:', firebaseId);
-
+      // Tentar salvar no Firebase com suporte offline
+      const { id: _localId, ...clientData } = newClient;
+      const firebaseId = await createWithOfflineSupport(
+        () => clientService.create(clientData),
+        'clients',
+        clientData,
+        { showToast: false }
+      );
+      
+      if (firebaseId) {
         // Atualizar o cliente local com o ID do Firebase
         const clientWithFirebaseId = { ...newClient, id: `firebase_${firebaseId}` };
         const updatedClientsWithFirebaseId = updatedClients.map(c => 
           c.id === newClient.id ? clientWithFirebaseId : c
         );
         setClients(updatedClientsWithFirebaseId);
-        
         alert('Cliente salvo com sucesso!');
-      } catch (firebaseError) {
-        console.error('Erro ao salvar no Firebase:', firebaseError);
-        alert('Cliente salvo localmente. Erro ao sincronizar com Firebase: ' + (firebaseError as Error).message);
+      } else {
+        alert(isOnline ? 
+          'Cliente salvo localmente. Erro ao sincronizar com Firebase.' :
+          'Cliente salvo offline. Será sincronizado quando voltar online.'
+        );
       }
 
       navigate('/clients');

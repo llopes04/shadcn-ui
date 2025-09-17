@@ -9,6 +9,7 @@ import { generateServiceOrderPDF, downloadPDF } from '@/utils/pdfGenerator';
 import { sendServiceOrderEmailJS, defaultEmailJSConfig, EmailJSConfig } from '@/utils/emailJSService';
 import RTIForm from '@/components/RTIForm';
 import { serviceOrderService, clientService } from '@/services/firebaseService';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { Search, Calendar } from 'lucide-react';
 
 interface LegacyServiceOrder extends Omit<ServiceOrder, 'geradores'> {
@@ -23,6 +24,7 @@ export default function OrdersList() {
   const [clients, setClients] = useLocalStorage<Client[]>('clients', []);
   const [rtis, setRTIs] = useLocalStorage<RTI[]>('rtis', []);
   const [currentUser] = useLocalStorage('currentUser', null);
+  const isOnline = useOnlineStatus();
   const [selectedOrder, setSelectedOrder] = useState<ServiceOrder | null>(null);
   const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null);
   const [showRTIForm, setShowRTIForm] = useState(false);
@@ -38,6 +40,16 @@ export default function OrdersList() {
     
     const loadFirebaseData = async () => {
       console.log('🚀 INICIANDO DIAGNÓSTICO COMPLETO...');
+      console.log('🌐 Status online:', isOnline);
+      
+      // Se estiver offline, manter dados locais
+      if (!isOnline) {
+        console.log('📱 Modo offline - mantendo dados locais');
+        console.log('📊 Dados locais - Ordens:', serviceOrders.length);
+        console.log('👥 Dados locais - Clientes:', clients.length);
+        return;
+      }
+      
       try {
         console.log('🔥 Iniciando carregamento do Firebase...');
         console.log('📊 Estado atual das ordens:', serviceOrders.length);
@@ -484,6 +496,11 @@ export default function OrdersList() {
             </Button>
             <Button 
               onClick={async () => {
+                if (!isOnline) {
+                  alert('📱 Você está offline. Não é possível sincronizar com o Firebase.');
+                  return;
+                }
+                
                 try {
                   console.log('🔄 Iniciando recarregamento manual do Firebase...');
                   console.log('📊 Estado atual antes do reload:', serviceOrders.length, 'ordens');

@@ -56,32 +56,35 @@ export default function ClientForm() {
 
       console.log('Salvando cliente:', newClient);
 
-      // Salvar no localStorage primeiro (para garantir que funcione mesmo sem Firebase)
+      // Salvar no localStorage primeiro (sempre funciona)
       const updatedClients = [...clients, newClient];
       setClients(updatedClients);
-
-      // Tentar salvar no Firebase com suporte offline
-      const { id: _localId, ...clientData } = newClient;
-      const firebaseId = await createWithOfflineSupport(
-        () => clientService.create(clientData),
-        'clients',
-        clientData,
-        { showToast: false }
-      );
       
-      if (firebaseId) {
-        // Atualizar o cliente local com o ID do Firebase
-        const clientWithFirebaseId = { ...newClient, id: `firebase_${firebaseId}` };
-        const updatedClientsWithFirebaseId = updatedClients.map(c => 
-          c.id === newClient.id ? clientWithFirebaseId : c
-        );
-        setClients(updatedClientsWithFirebaseId);
-        alert('Cliente salvo com sucesso!');
-      } else {
-        alert(isOnline ? 
-          'Cliente salvo localmente. Erro ao sincronizar com Firebase.' :
-          'Cliente salvo offline. Será sincronizado quando voltar online.'
-        );
+      // Se estiver offline, apenas salvar localmente
+      if (!isOnline) {
+        alert('📱 Cliente salvo offline. Será sincronizado quando voltar online.');
+        navigate('/clients');
+        return;
+      }
+
+      // Se estiver online, tentar salvar no Firebase
+      const { id: _localId, ...clientData } = newClient;
+      
+      try {
+        const firebaseId = await clientService.create(clientData);
+        
+        if (firebaseId) {
+          // Atualizar o cliente local com o ID do Firebase
+          const clientWithFirebaseId = { ...newClient, id: `firebase_${firebaseId}` };
+          const updatedClientsWithFirebaseId = updatedClients.map(c => 
+            c.id === newClient.id ? clientWithFirebaseId : c
+          );
+          setClients(updatedClientsWithFirebaseId);
+          alert('✅ Cliente salvo com sucesso no sistema local e Firebase!');
+        }
+      } catch (firebaseError) {
+        console.error('Erro ao salvar no Firebase:', firebaseError);
+        alert('⚠️ Cliente salvo localmente. Erro ao sincronizar com Firebase.');
       }
 
       navigate('/clients');

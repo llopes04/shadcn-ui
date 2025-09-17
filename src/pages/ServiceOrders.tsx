@@ -68,7 +68,14 @@ export default function ServiceOrders() {
       const updatedOrders = [...serviceOrders, orderWithSignature];
       setServiceOrders(updatedOrders);
 
-      // Tentar salvar no Firebase com suporte offline
+      // Se estiver offline, apenas salvar localmente
+      if (!isOnline) {
+        alert('📱 Ordem de serviço salva offline. Será sincronizada quando voltar online.');
+        navigate('/orders');
+        return;
+      }
+
+      // Se estiver online, tentar salvar no Firebase
       if (isFirebaseConfigured()) {
         const { id: _omit, ...orderData } = orderWithSignature;
         
@@ -77,26 +84,21 @@ export default function ServiceOrders() {
           Object.entries(orderData).filter(([_, value]) => value !== undefined)
         );
         
-        const firebaseId = await createWithOfflineSupport(
-          () => serviceOrderService.create(cleanOrderData),
-          'service_orders',
-          cleanOrderData,
-          { showToast: false }
-        );
-        
-        if (firebaseId) {
-          // Atualizar o ID local com referência do Firebase
-          const orderWithFirebaseId = { ...orderWithSignature, id: `firebase_${firebaseId}` };
-          const finalOrders = updatedOrders.map(order => 
-            order.id === orderWithSignature.id ? orderWithFirebaseId : order
-          );
-          setServiceOrders(finalOrders);
-          alert('✅ Ordem de serviço salva com sucesso no sistema local e Firebase!');
-        } else {
-          alert(isOnline ? 
-            '⚠️ Ordem de serviço salva localmente. Erro ao sincronizar com Firebase.' :
-            'ℹ️ Ordem de serviço salva offline. Será sincronizada quando voltar online.'
-          );
+        try {
+          const firebaseId = await serviceOrderService.create(cleanOrderData);
+          
+          if (firebaseId) {
+            // Atualizar o ID local com referência do Firebase
+            const orderWithFirebaseId = { ...orderWithSignature, id: `firebase_${firebaseId}` };
+            const finalOrders = updatedOrders.map(order => 
+              order.id === orderWithSignature.id ? orderWithFirebaseId : order
+            );
+            setServiceOrders(finalOrders);
+            alert('✅ Ordem de serviço salva com sucesso no sistema local e Firebase!');
+          }
+        } catch (firebaseError) {
+          console.error('Erro ao salvar no Firebase:', firebaseError);
+          alert('⚠️ Ordem de serviço salva localmente. Erro ao sincronizar com Firebase.');
         }
       } else {
         alert('ℹ️ Ordem de serviço salva localmente. Configure o Firebase para sincronização automática.');

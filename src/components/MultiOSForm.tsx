@@ -13,6 +13,7 @@ import { Trash2, Plus, Copy } from 'lucide-react';
 import { serviceOrderService } from '@/services/firebaseService';
 import { isFirebaseConfigured } from '@/lib/firebase';
 import { useOfflineFirebase } from '@/hooks/useOfflineFirebase';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 interface MultiOSFormProps {
   client: Client;
@@ -46,7 +47,8 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
   const navigate = useNavigate();
   const [serviceOrders, setServiceOrders] = useLocalStorage<ServiceOrder[]>('serviceOrders', []);
   const [storedCurrentUser] = useLocalStorage('currentUser', null);
-  const { createWithOfflineSupport, isOnline } = useOfflineFirebase();
+  const { createWithOfflineSupport } = useOfflineFirebase();
+  const { isOnline } = useOnlineStatus();
 
   // Use props or fallback to stored values
   const user = currentUser || storedCurrentUser;
@@ -155,7 +157,7 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
       id: Date.now().toString(),
       tecnico: tecnico.trim(),
       data,
-      cliente_id: client.id.replace(/^firebase_/, ''), // Remove prefixo firebase_ do ID
+      cliente_id: client?.id ? client.id.replace(/^firebase_/, '') : '', // Remove prefixo firebase_ do ID
       geradores: selectedGenerators,
       ...(observacoesGerais.trim() && { observacoes_gerais: observacoesGerais.trim() }),
       ...(representante.trim() && { representante: representante.trim() })
@@ -165,13 +167,29 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
       // Se há callback, usar ele (modo assinatura)
       onSave(newOrder);
     } else {
-      // Salvar diretamente (modo antigo) com integração Firebase
+      // Salvar no localStorage primeiro (sempre funciona)
       try {
-        // Salvar no localStorage primeiro
+        console.log('Iniciando salvamento offline/online...');
+        console.log('Status online:', isOnline);
+        console.log('Nova ordem:', newOrder);
+        
         const updatedOrders = [...serviceOrders, newOrder];
+        console.log('Ordens atualizadas:', updatedOrders);
+        
         setServiceOrders(updatedOrders);
+        console.log('Dados salvos no localStorage');
+        
+        // Se estiver offline, apenas salvar localmente
+        if (!isOnline) {
+          console.log('Modo offline detectado - finalizando salvamento');
+          alert('📱 Ordem de serviço salva offline. Será sincronizada quando voltar online.');
+          navigate('/orders');
+          return;
+        }
+        
+        console.log('Modo online - tentando sincronizar com Firebase...');
 
-        // Tentar salvar no Firebase com suporte offline
+        // Se estiver online, tentar salvar no Firebase
         if (isFirebaseConfigured()) {
           const { id: _omit, ...orderData } = newOrder;
           
@@ -180,26 +198,21 @@ export default function MultiOSForm({ client, onSave, onCancel, clients, current
             Object.entries(orderData).filter(([_, value]) => value !== undefined)
           );
           
-          const firebaseId = await createWithOfflineSupport(
-            () => serviceOrderService.create(cleanOrderData),
-            'service_orders',
-            cleanOrderData,
-            { showToast: false }
-          );
-          
-          if (firebaseId) {
-            // Atualizar o ID local com referência do Firebase
-            const orderWithFirebaseId = { ...newOrder, id: `firebase_${firebaseId}` };
-            const finalOrders = updatedOrders.map(order => 
-              order.id === newOrder.id ? orderWithFirebaseId : order
-            );
-            setServiceOrders(finalOrders);
-            alert('✅ Ordem de serviço salva com sucesso no sistema local e Firebase!');
-          } else {
-            alert(isOnline ? 
-              '⚠️ Ordem de serviço salva localmente. Erro ao sincronizar com Firebase.' :
-              'ℹ️ Ordem de serviço salva offline. Será sincronizada quando voltar online.'
-            );
+          try {
+            const firebaseId = await serviceOrderService.create(cleanOrderData);
+            
+            if (firebaseId) {
+              // Atualizar o ID local com referência do Firebase
+              const orderWithFirebaseId = { ...newOrder, id: `firebase_${firebaseId}` };
+              const finalOrders = updatedOrders.map(order => 
+                order.id === newOrder.id ? orderWithFirebaseId : order
+              );
+              setServiceOrders(finalOrders);
+              alert('✅ Ordem de serviço salva com sucesso no sistema local e Firebase!');
+            }
+          } catch (firebaseError) {
+            console.error('Erro ao salvar no Firebase:', firebaseError);
+            alert('⚠️ Ordem de serviço salva localmente. Erro ao sincronizar com Firebase.');
           }
         } else {
           alert('ℹ️ Ordem de serviço salva localmente. Configure o Firebase para sincronização automática.');
